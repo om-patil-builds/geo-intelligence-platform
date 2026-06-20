@@ -11,6 +11,14 @@ const { errorHandler, notFoundHandler } = require('./middleware/errorHandler');
 
 const app = express();
 
+// Test Route
+app.get("/", (req, res) => {
+  res.status(200).json({
+    success: true,
+    message: "Geo Intelligence Platform API is running"
+  });
+});
+
 app.use(cors({
   origin: process.env.CLIENT_URL || 'http://localhost:5173',
   credentials: true,
