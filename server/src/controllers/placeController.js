@@ -1,37 +1,38 @@
-import mongoose from 'mongoose';
+import mongoose from "mongoose";
 
-import Place from '../models/Place.js';
-import SearchHistory from '../models/SearchHistory.js';
-import asyncHandler from '../utils/asyncHandler.js';
-import { isFuzzyDuplicate } from './services/deduplication.js';
-import { searchGooglePlaces } from './services/googlePlaces.js';
-import { validateAndCleanPlace } from './services/validation.js';
+import Place from "../models/Place.js";
+import SearchHistory from "../models/SearchHistory.js";
+import SearchResult from "../models/SearchResult.js";
+import asyncHandler from "../utils/asyncHandler.js";
+import { isFuzzyDuplicate } from "./services/deduplication.js";
+import { searchGooglePlaces } from "./services/googlePlaces.js";
+import { validateAndCleanPlace } from "./services/validation.js";
 
 function parsePositiveNumber(value, fallback) {
   const parsed = Number(value);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
-function buildPlaceQuery(query) {
-  const filters = {};
+function buildPlaceQuery(query, userId) {
+  const filters = { user: userId };
 
   if (query.keyword) {
-    filters.searchKeyword = new RegExp(String(query.keyword), 'i');
+    filters.searchKeyword = new RegExp(String(query.keyword), "i");
   }
 
   if (query.location || query.city) {
-    filters.searchLocation = new RegExp(String(query.location || query.city), 'i');
+    filters.searchLocation = new RegExp(String(query.location || query.city), "i");
   }
 
   if (query.tier) {
     filters.leadTier = query.tier;
   }
 
-  if (query.hasWebsite === 'true') {
+  if (query.hasWebsite === "true") {
     filters.website = { $ne: null };
   }
 
-  if (query.hasPhone === 'true') {
+  if (query.hasPhone === "true") {
     filters.phone = { $ne: null };
   }
 
@@ -43,22 +44,24 @@ function buildPlaceQuery(query) {
 }
 
 const searchPlaces = asyncHandler(async (req, res) => {
-  const keyword = String(req.body.keyword || '').trim();
-  const location = String(req.body.location || req.body.city || '').trim();
+  const userId = req.user._id;
+  const keyword = String(req.body.keyword || "").trim();
+  const location = String(req.body.location || req.body.city || "").trim();
   const radius = parsePositiveNumber(req.body.radius, 10000);
   const maxResults = parsePositiveNumber(req.body.maxResults, Number(process.env.GOOGLE_MAX_RESULTS || 40));
 
   if (!keyword || !location) {
-    const error = new Error('keyword and location are required');
+    const error = new Error("keyword and location are required");
     error.statusCode = 400;
     throw error;
   }
 
   const history = await SearchHistory.create({
+    user: userId,
     keyword,
     location,
     radius,
-    status: 'processing',
+    status: "processing",
   });
   history.jobId = history._id.toString();
   await history.save();
@@ -70,35 +73,105 @@ const searchPlaces = asyncHandler(async (req, res) => {
       .filter(Boolean);
 
     const existingByPlaceId = await Place.find({
+      user: userId,
       placeId: { $in: cleanedPlaces.map((place) => place.placeId) },
     });
-    const existingPlaceIds = new Set(existingByPlaceId.map((place) => place.placeId));
+    const existingByPlaceIdMap = new Map(existingByPlaceId.map((place) => [place.placeId, place]));
     const fuzzyComparisonPlaces = await Place.find({
-      searchLocation: new RegExp(location, 'i'),
+      user: userId,
+      searchLocation: new RegExp(location, "i"),
     }).limit(500);
 
-    const placesToInsert = [];
+    const searchResultWrites = [];
+    const relatedPlaceIds = [];
+    const insertedPlaces = [];
     let duplicateCount = 0;
 
-    for (const place of cleanedPlaces) {
-      if (existingPlaceIds.has(place.placeId)) {
+    for (const cleanedPlace of cleanedPlaces) {
+      const existingPlace = existingByPlaceIdMap.get(cleanedPlace.placeId);
+
+      if (existingPlace) {
         duplicateCount += 1;
+        relatedPlaceIds.push(existingPlace._id);
+        searchResultWrites.push({
+          updateOne: {
+            filter: { user: userId, searchHistory: history._id, place: existingPlace._id },
+            update: {
+              $setOnInsert: {
+                user: userId,
+                searchHistory: history._id,
+                place: existingPlace._id,
+                googlePlaceId: cleanedPlace.placeId,
+                isNew: false,
+                duplicate: true,
+                duplicateReason: "placeId",
+              },
+            },
+            upsert: true,
+          },
+        });
         continue;
       }
 
-      if (isFuzzyDuplicate(place, [...fuzzyComparisonPlaces, ...placesToInsert])) {
+      const fuzzyDuplicate = [...fuzzyComparisonPlaces, ...insertedPlaces].find((place) => (
+        isFuzzyDuplicate(cleanedPlace, [place])
+      ));
+
+      if (fuzzyDuplicate) {
         duplicateCount += 1;
+        relatedPlaceIds.push(fuzzyDuplicate._id);
+        searchResultWrites.push({
+          updateOne: {
+            filter: { user: userId, searchHistory: history._id, place: fuzzyDuplicate._id },
+            update: {
+              $setOnInsert: {
+                user: userId,
+                searchHistory: history._id,
+                place: fuzzyDuplicate._id,
+                googlePlaceId: cleanedPlace.placeId,
+                isNew: false,
+                duplicate: true,
+                duplicateReason: "fuzzy",
+              },
+            },
+            upsert: true,
+          },
+        });
         continue;
       }
 
-      placesToInsert.push(place);
+      const createdPlace = await Place.create({
+        ...cleanedPlace,
+        user: userId,
+      });
+      insertedPlaces.push(createdPlace);
+      relatedPlaceIds.push(createdPlace._id);
+      existingByPlaceIdMap.set(createdPlace.placeId, createdPlace);
+
+      searchResultWrites.push({
+        updateOne: {
+          filter: { user: userId, searchHistory: history._id, place: createdPlace._id },
+          update: {
+            $setOnInsert: {
+              user: userId,
+              searchHistory: history._id,
+              place: createdPlace._id,
+              googlePlaceId: createdPlace.placeId,
+              isNew: true,
+              duplicate: false,
+              duplicateReason: "none",
+            },
+          },
+          upsert: true,
+        },
+      });
     }
 
-    const insertedPlaces = placesToInsert.length > 0
-      ? await Place.insertMany(placesToInsert, { ordered: false })
-      : [];
+    if (searchResultWrites.length > 0) {
+      await SearchResult.bulkWrite(searchResultWrites, { ordered: false });
+    }
 
-    history.status = 'done';
+    history.status = "done";
     history.resultsCount = cleanedPlaces.length;
     history.newCount = insertedPlaces.length;
     history.duplicateCount = duplicateCount;
@@ -106,7 +179,8 @@ const searchPlaces = asyncHandler(async (req, res) => {
     await history.save();
 
     const data = await Place.find({
-      placeId: { $in: cleanedPlaces.map((place) => place.placeId) },
+      user: userId,
+      _id: { $in: relatedPlaceIds },
     }).sort({ leadScore: -1, rating: -1 });
 
     res.status(201).json({
@@ -119,7 +193,7 @@ const searchPlaces = asyncHandler(async (req, res) => {
       data,
     });
   } catch (error) {
-    history.status = 'failed';
+    history.status = "failed";
     history.errorMessage = error.message;
     await history.save();
     throw error;
@@ -130,7 +204,7 @@ const getPlaces = asyncHandler(async (req, res) => {
   const page = parsePositiveNumber(req.query.page, 1);
   const limit = Math.min(parsePositiveNumber(req.query.limit, 20), 100);
   const skip = (page - 1) * limit;
-  const filters = buildPlaceQuery(req.query);
+  const filters = buildPlaceQuery(req.query, req.user._id);
 
   const [data, total] = await Promise.all([
     Place.find(filters).sort({ createdAt: -1 }).skip(skip).limit(limit),
@@ -150,15 +224,15 @@ const getPlaces = asyncHandler(async (req, res) => {
 
 const getPlaceById = asyncHandler(async (req, res) => {
   if (!mongoose.isValidObjectId(req.params.id)) {
-    const error = new Error('Invalid place id');
+    const error = new Error("Invalid place id");
     error.statusCode = 400;
     throw error;
   }
 
-  const place = await Place.findById(req.params.id);
+  const place = await Place.findOne({ _id: req.params.id, user: req.user._id });
 
   if (!place) {
-    const error = new Error('Place not found');
+    const error = new Error("Place not found");
     error.statusCode = 404;
     throw error;
   }
@@ -168,27 +242,32 @@ const getPlaceById = asyncHandler(async (req, res) => {
 
 const deletePlace = asyncHandler(async (req, res) => {
   if (!mongoose.isValidObjectId(req.params.id)) {
-    const error = new Error('Invalid place id');
+    const error = new Error("Invalid place id");
     error.statusCode = 400;
     throw error;
   }
 
-  const deleted = await Place.findByIdAndDelete(req.params.id);
+  const deleted = await Place.findOneAndDelete({ _id: req.params.id, user: req.user._id });
 
   if (!deleted) {
-    const error = new Error('Place not found');
+    const error = new Error("Place not found");
     error.statusCode = 404;
     throw error;
   }
 
-  res.json({ success: true, message: 'Place deleted' });
+  await SearchResult.deleteMany({ user: req.user._id, place: deleted._id });
+
+  res.json({ success: true, message: "Place deleted" });
 });
 
 const getSearchStatus = asyncHandler(async (req, res) => {
-  const history = await SearchHistory.findOne({ jobId: req.params.jobId });
+  const history = await SearchHistory.findOne({
+    user: req.user._id,
+    jobId: req.params.jobId,
+  });
 
   if (!history) {
-    const error = new Error('Search job not found');
+    const error = new Error("Search job not found");
     error.statusCode = 404;
     throw error;
   }

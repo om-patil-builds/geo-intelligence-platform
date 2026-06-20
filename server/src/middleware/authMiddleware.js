@@ -2,30 +2,37 @@ import jwt from "jsonwebtoken";
 import User from "../models/User.js";
 
 const authMiddleware = async (req, res, next) => {
-  let token;
+  const authHeader = req.headers.authorization || "";
+  const token = authHeader.startsWith("Bearer ") ? authHeader.split(" ")[1] : null;
 
-  if (
-    req.headers.authorization &&
-    req.headers.authorization.startsWith("Bearer")
-  ) {
-    try {
-      token = req.headers.authorization.split(" ")[1];
+  if (!token) {
+    return res.status(401).json({
+      success: false,
+      message: "Not authorized, no token",
+    });
+  }
 
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+  try {
+    if (!process.env.JWT_SECRET) {
+      throw new Error("JWT_SECRET is required");
+    }
 
-      req.user = await User.findById(decoded.id).select("-password");
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const user = await User.findById(decoded.id).select("-password");
 
-      next();
-    } catch (error) {
-      res.status(401).json({
+    if (!user) {
+      return res.status(401).json({
         success: false,
-        message: "Not authorized, token failed"
+        message: "Not authorized, user not found",
       });
     }
-  } else {
-    res.status(401).json({
+
+    req.user = user;
+    next();
+  } catch (error) {
+    return res.status(401).json({
       success: false,
-      message: "Not authorized, no token"
+      message: "Not authorized, token failed",
     });
   }
 };
