@@ -53,6 +53,12 @@ const Navbar = () => {
                 Home
               </NavLink>
             )}
+            <NavLink to="/pricing" className={navLinkClass}>
+              Pricing
+            </NavLink>
+            <NavLink to="/faq" className={navLinkClass}>
+              FAQ
+            </NavLink>
           </div>
 
           {/* Auth buttons */}
@@ -123,6 +129,20 @@ const Navbar = () => {
                 >
                   Search History
                 </NavLink>
+                <NavLink
+                  to="/pricing"
+                  onClick={() => setIsOpen(false)}
+                  className="block px-3 py-2.5 rounded-xl text-base font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+                >
+                  Pricing
+                </NavLink>
+                <NavLink
+                  to="/faq"
+                  onClick={() => setIsOpen(false)}
+                  className="block px-3 py-2.5 rounded-xl text-base font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+                >
+                  FAQ
+                </NavLink>
                 <div className="border-t border-slate-200 dark:border-slate-800 my-2 pt-2">
                   <div className="px-3 py-2 flex items-center gap-2 text-slate-500 dark:text-slate-400">
                     <User className="w-5 h-5" />
@@ -145,6 +165,20 @@ const Navbar = () => {
                   className="block px-3 py-2.5 rounded-xl text-base font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
                 >
                   Home
+                </NavLink>
+                <NavLink
+                  to="/pricing"
+                  onClick={() => setIsOpen(false)}
+                  className="block px-3 py-2.5 rounded-xl text-base font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+                >
+                  Pricing
+                </NavLink>
+                <NavLink
+                  to="/faq"
+                  onClick={() => setIsOpen(false)}
+                  className="block px-3 py-2.5 rounded-xl text-base font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+                >
+                  FAQ
                 </NavLink>
                 <div className="border-t border-slate-200 dark:border-slate-800 my-2 pt-2 flex flex-col gap-2 px-3">
                   <Link

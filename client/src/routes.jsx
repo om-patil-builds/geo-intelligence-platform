@@ -7,6 +7,8 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import SearchHistory from './pages/SearchHistory';
 import HistoryResults from './pages/HistoryResults';
+import FAQ from './pages/FAQ';
+import Pricing from './pages/Pricing';
 import NotFound from './pages/NotFound';
 import LoadingSpinner from './components/LoadingSpinner';
 
@@ -43,6 +45,8 @@ const AppRoutes = () => {
         <Route index element={<Home />} />
         <Route path="login" element={<Login />} />
         <Route path="register" element={<Register />} />
+        <Route path="faq" element={<FAQ />} />
+        <Route path="pricing" element={<Pricing />} />
 
         {/* Protected Routes */}
         <Route element={<ProtectedLayout />}>
