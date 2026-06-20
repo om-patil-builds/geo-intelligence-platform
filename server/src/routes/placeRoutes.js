@@ -5,6 +5,7 @@ import {
   getPlaces,
   getSearchStatus,
   searchPlaces,
+  generatePlaceSummary,
 } from "../controllers/placeController.js";
 import authMiddleware from "../middleware/authMiddleware.js";
 
@@ -17,5 +18,6 @@ router.get("/status/:jobId", getSearchStatus);
 router.get("/", getPlaces);
 router.get("/:id", getPlaceById);
 router.delete("/:id", deletePlace);
+router.post("/:id/summary", generatePlaceSummary);
 
 export default router;

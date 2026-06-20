@@ -25,6 +25,7 @@ const placeSchema = new mongoose.Schema(
     leadTier: { type: String, enum: ["high", "medium", "low"], default: "low" },
     rawTypes: { type: [String], default: [] },
     source: { type: String, default: "google_places" },
+    aiSummary: { type: String, default: null },
   },
   {
     timestamps: true,

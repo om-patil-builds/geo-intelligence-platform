@@ -1,10 +1,13 @@
 import { useState, Fragment } from 'react';
-import { Star, Globe, Phone, Clock, Trash2, ChevronUp, ExternalLink } from 'lucide-react';
+import { Star, Globe, Phone, Clock, Trash2, ChevronUp, ExternalLink, Sparkles, Loader2 } from 'lucide-react';
 import { LEAD_TIER_COLORS } from '../utils/constants';
+import placeService from '../services/placeService';
 
 
 const ResultsTable = ({ places = [], onDelete, deletingId }) => {
   const [expandedHours, setExpandedHours] = useState({});
+  const [localSummaries, setLocalSummaries] = useState({});
+  const [summarizingId, setSummarizingId] = useState(null);
 
   const toggleHours = (id) => {
     setExpandedHours(prev => ({
@@ -17,6 +20,26 @@ const ResultsTable = ({ places = [], onDelete, deletingId }) => {
     const baseStyle = 'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border';
     const colorStyle = LEAD_TIER_COLORS[tier] || LEAD_TIER_COLORS.low;
     return <span className={`${baseStyle} ${colorStyle}`}>{tier}</span>;
+  };
+
+  const handleGenerateSummary = async (placeId) => {
+    if (summarizingId) return;
+    setSummarizingId(placeId);
+    try {
+      const res = await placeService.generateSummary(placeId);
+      if (res.success) {
+        setLocalSummaries(prev => ({
+          ...prev,
+          [placeId]: res.summary
+        }));
+      } else {
+        alert(res.message || 'Failed to generate summary');
+      }
+    } catch (err) {
+      alert(err.response?.data?.message || err.message || 'Error generating AI summary');
+    } finally {
+      setSummarizingId(null);
+    }
   };
 
   return (
@@ -37,6 +60,7 @@ const ResultsTable = ({ places = [], onDelete, deletingId }) => {
             {places.map((place) => {
               const hasHours = place.openingHours && place.openingHours.length > 0;
               const isHoursExpanded = expandedHours[place._id];
+              const summaryText = localSummaries[place._id] || place.aiSummary;
 
               return (
                 <Fragment key={place._id}>
@@ -62,8 +86,8 @@ const ResultsTable = ({ places = [], onDelete, deletingId }) => {
                     <td className="py-4 px-6 space-y-1">
                       {place.phone ? (
                         <a
-                          href={`tel:${place.phone}`}
-                          className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 hover:text-violet-600 dark:hover:text-violet-400 transition"
+                           href={`tel:${place.phone}`}
+                           className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 hover:text-violet-600 dark:hover:text-violet-400 transition"
                         >
                           <Phone className="w-3.5 h-3.5" />
                           <span>{place.phone}</span>
@@ -130,6 +154,19 @@ const ResultsTable = ({ places = [], onDelete, deletingId }) => {
                       )}
                       
                       <button
+                        onClick={() => handleGenerateSummary(place._id)}
+                        disabled={summarizingId === place._id}
+                        className="p-2 hover:bg-violet-50 dark:hover:bg-violet-950/20 text-violet-500 hover:text-violet-750 dark:hover:text-violet-400 rounded-xl transition inline-flex items-center justify-center disabled:opacity-50 cursor-pointer"
+                        title="Generate AI Summary"
+                      >
+                        {summarizingId === place._id ? (
+                          <Loader2 className="w-4 h-4 animate-spin text-violet-600 dark:text-violet-400" />
+                        ) : (
+                          <Sparkles className="w-4 h-4 text-violet-600 dark:text-violet-400" />
+                        )}
+                      </button>
+
+                      <button
                         onClick={() => onDelete(place._id)}
                         disabled={deletingId === place._id}
                         className="p-2 hover:bg-red-50 dark:hover:bg-red-950/20 text-slate-400 hover:text-red-600 dark:hover:text-red-400 rounded-xl transition inline-flex items-center justify-center disabled:opacity-50 cursor-pointer"
@@ -158,6 +195,23 @@ const ResultsTable = ({ places = [], onDelete, deletingId }) => {
                                 {hour}
                               </div>
                             ))}
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+
+                  {/* Expanded AI Summary row */}
+                  {summaryText && (
+                    <tr className="bg-violet-50/10 dark:bg-violet-950/5">
+                      <td colSpan="6" className="py-4 px-6 border-b border-slate-200 dark:border-slate-800">
+                        <div className="flex flex-col gap-1.5 py-1">
+                          <span className="text-xs font-bold text-violet-600 dark:text-violet-400 uppercase tracking-wider flex items-center gap-1.5">
+                            <Sparkles className="w-3.5 h-3.5 text-violet-500 animate-pulse animate-pulse-slow" />
+                            AI Intelligence Summary
+                          </span>
+                          <div className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed bg-violet-50/30 dark:bg-violet-950/10 p-3.5 rounded-xl border border-violet-100/50 dark:border-violet-900/30 mt-1 max-w-4xl">
+                            {summaryText}
                           </div>
                         </div>
                       </td>

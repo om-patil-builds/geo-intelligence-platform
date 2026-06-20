@@ -7,6 +7,7 @@ import asyncHandler from "../utils/asyncHandler.js";
 import { isFuzzyDuplicate } from "./services/deduplication.js";
 import { searchGooglePlaces } from "./services/googlePlaces.js";
 import { validateAndCleanPlace } from "./services/validation.js";
+import { generateSummary } from "./services/gemini.js";
 
 function parsePositiveNumber(value, fallback) {
   const parsed = Number(value);
@@ -275,10 +276,41 @@ const getSearchStatus = asyncHandler(async (req, res) => {
   res.json({ success: true, data: history });
 });
 
+const generatePlaceSummary = asyncHandler(async (req, res) => {
+  const placeId = req.params.id;
+  const userId = req.user._id;
+
+  if (!mongoose.isValidObjectId(placeId)) {
+    const error = new Error("Invalid place id");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const place = await Place.findOne({ _id: placeId, user: userId });
+
+  if (!place) {
+    const error = new Error("Place not found");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  if (place.aiSummary) {
+    return res.json({ success: true, summary: place.aiSummary });
+  }
+
+  const summary = await generateSummary(place);
+
+  place.aiSummary = summary;
+  await place.save();
+
+  res.json({ success: true, summary });
+});
+
 export {
   deletePlace,
   getPlaceById,
   getPlaces,
   getSearchStatus,
   searchPlaces,
+  generatePlaceSummary,
 };

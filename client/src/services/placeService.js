@@ -129,6 +129,14 @@ const placeService = {
       responseType: 'blob'
     });
     return response.data;
+  },
+
+  /**
+   * Request AI Summary for a place
+   */
+  generateSummary: async (id) => {
+    const response = await api.post(`/places/${id}/summary`);
+    return response.data;
   }
 };
 
