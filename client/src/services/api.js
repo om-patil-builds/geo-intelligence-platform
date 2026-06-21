@@ -6,8 +6,6 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  // If the server uses cookies for session handling (like cookie-parser),
-  // we can also pass withCredentials: true.
   withCredentials: true,
 });
 
