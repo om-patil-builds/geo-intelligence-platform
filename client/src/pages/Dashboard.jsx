@@ -8,6 +8,7 @@ import ResultsTable from '../components/ResultsTable';
 import LoadingSpinner from '../components/LoadingSpinner';
 import ErrorMessage from '../components/ErrorMessage';
 import EmptyState from '../components/EmptyState';
+import LeadTierFilter from '../components/LeadTierFilter';
 import {
   Activity,
   BarChart3,
@@ -58,9 +59,19 @@ const Dashboard = () => {
 
   const [deletingId, setDeletingId] = useState(null);
   const [successMsg, setSuccessMsg] = useState('');
+  const [selectedTier, setSelectedTier] = useState('all');
+  const [displayedCount, setDisplayedCount] = useState(20);
 
   const activeLocation = currentFilters?.location || currentFilters?.city || 'No active market';
   const activeKeyword = currentFilters?.keyword || 'Select a segment';
+
+  // Filter places based on selected tier
+  const filteredPlaces = selectedTier === 'all' 
+    ? places 
+    : places.filter(place => place.leadTier === selectedTier);
+
+  // Paginate filtered places - show only the first displayedCount records
+  const paginatedPlaces = filteredPlaces.slice(0, displayedCount);
   const leadCaptureRate = searchStats.totalPlaces > 0
     ? Math.round((Math.max(searchStats.newCount || 0, 0) / searchStats.totalPlaces) * 100)
     : 0;
@@ -85,8 +96,14 @@ const Dashboard = () => {
 
   const handleSearchSubmit = async (formData) => {
     setSuccessMsg('');
+    setSelectedTier('all'); // Reset filter when new search is performed
+    setDisplayedCount(20); // Reset pagination when new search is performed
     setCurrentFilters(formData);
     await search(formData.keyword, formData.location, formData.radius, formData.maxResults);
+  };
+
+  const handleViewMore = () => {
+    setDisplayedCount(prev => prev + 20);
   };
 
   const handleDelete = async (id) => {
@@ -248,7 +265,7 @@ const Dashboard = () => {
                   <div>
                     <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-2">
                       <Building2 className="w-4 h-4 text-violet-500" />
-                      Discovered Leads ({places.length})
+                      Discovered Leads ({filteredPlaces.length})
                     </h3>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                       Ranked place records with contact coverage, ratings, lead tier, and AI summaries.
@@ -265,11 +282,30 @@ const Dashboard = () => {
                     </span>
                   </div>
                 </div>
+
+                {/* Lead Tier Filter */}
+                <LeadTierFilter 
+                  selectedTier={selectedTier}
+                  onTierChange={setSelectedTier}
+                />
+
                 <ResultsTable
-                  places={places}
+                  places={paginatedPlaces}
                   onDelete={handleDelete}
                   deletingId={deletingId}
                 />
+
+                {/* View More Button */}
+                {filteredPlaces.length > displayedCount && (
+                  <div className="flex justify-center mt-6">
+                    <button
+                      onClick={handleViewMore}
+                      className="px-8 py-3 text-sm font-semibold text-white bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 rounded-xl shadow-md shadow-violet-500/20 hover:shadow-violet-500/30 transition duration-300 cursor-pointer"
+                    >
+                      View More Places ({filteredPlaces.length - displayedCount} remaining)
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           ) : (
