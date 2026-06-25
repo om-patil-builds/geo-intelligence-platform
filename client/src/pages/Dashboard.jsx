@@ -62,12 +62,10 @@ const Dashboard = () => {
   const [selectedTier, setSelectedTier] = useState('all');
   const [displayedCount, setDisplayedCount] = useState(20);
 
-  const activeLocation = currentFilters?.location || currentFilters?.city || 'No active market';
-  const activeKeyword = currentFilters?.keyword || 'Select a segment';
 
   // Filter places based on selected tier
-  const filteredPlaces = selectedTier === 'all' 
-    ? places 
+  const filteredPlaces = selectedTier === 'all'
+    ? places
     : places.filter(place => place.leadTier === selectedTier);
 
   // Paginate filtered places - show only the first displayedCount records
@@ -146,25 +144,7 @@ const Dashboard = () => {
               </p>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div className="rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white/80 dark:bg-slate-950/35 p-4">
-                <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                  <Target className="w-4 h-4 text-violet-500" />
-                  Segment
-                </div>
-                <p className="mt-2 text-sm font-bold text-slate-900 dark:text-white truncate" title={activeKeyword}>
-                  {activeKeyword}
-                </p>
-              </div>
-              <div className="rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white/80 dark:bg-slate-950/35 p-4">
-                <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                  <MapPinned className="w-4 h-4 text-cyan-500" />
-                  Market
-                </div>
-                <p className="mt-2 text-sm font-bold text-slate-900 dark:text-white truncate" title={activeLocation}>
-                  {activeLocation}
-                </p>
-              </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white/80 dark:bg-slate-950/35 p-4">
                 <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
                   <ShieldCheck className="w-4 h-4 text-emerald-500" />
@@ -174,50 +154,58 @@ const Dashboard = () => {
                   {searchStats.totalPlaces > 0 ? `${100 - duplicateRate}% clean` : 'Ready'}
                 </p>
               </div>
-            </div>
-          </div>
 
-          <div className="relative min-h-[260px] rounded-3xl border border-slate-200 dark:border-slate-800 bg-slate-950 text-white overflow-hidden shadow-2xl shadow-slate-300/40 dark:shadow-slate-950/40">
-            <div className="absolute inset-0 opacity-50 bg-[linear-gradient(rgba(148,163,184,0.12)_1px,transparent_1px),linear-gradient(90deg,rgba(148,163,184,0.12)_1px,transparent_1px)] bg-[size:28px_28px]" />
-            <div className="absolute -top-16 -right-12 h-44 w-44 rounded-full bg-cyan-400/20 blur-2xl" />
-            <div className="absolute -bottom-20 -left-16 h-52 w-52 rounded-full bg-violet-500/25 blur-2xl" />
-            <div className="relative h-full p-5 flex flex-col justify-between">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Coverage Scan</p>
-                  <p className="mt-1 text-lg font-extrabold">{activeLocation}</p>
+              <div className="rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white/80 dark:bg-slate-950/35 p-4">
+                <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                  <Activity className="w-4 h-4 text-violet-500" />
+                  Lead Capture
                 </div>
-                <div className="h-11 w-11 rounded-2xl bg-white/10 border border-white/10 flex items-center justify-center">
-                  <Radar className="w-5 h-5 text-cyan-300" />
-                </div>
-              </div>
-
-              <div className="relative mx-auto my-2 h-32 w-32 rounded-full border border-cyan-300/40 flex items-center justify-center">
-                <div className="absolute inset-4 rounded-full border border-violet-300/30" />
-                <div className="absolute inset-9 rounded-full bg-cyan-300/20 border border-cyan-200/50" />
-                <div className="absolute left-4 top-9 h-2.5 w-2.5 rounded-full bg-emerald-300 shadow-lg shadow-emerald-300/40" />
-                <div className="absolute right-7 top-5 h-2 w-2 rounded-full bg-amber-300 shadow-lg shadow-amber-300/40" />
-                <div className="absolute right-8 bottom-8 h-3 w-3 rounded-full bg-violet-300 shadow-lg shadow-violet-300/40" />
-                <Crosshair className="relative w-7 h-7 text-white" />
-              </div>
-
-              <div className="grid grid-cols-3 gap-3">
-                <div className="rounded-2xl bg-white/10 border border-white/10 p-3">
-                  <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">Leads</p>
-                  <p className="text-lg font-extrabold">{searchStats.totalPlaces}</p>
-                </div>
-                <div className="rounded-2xl bg-white/10 border border-white/10 p-3">
-                  <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">New</p>
-                  <p className="text-lg font-extrabold">{leadCaptureRate}%</p>
-                </div>
-                <div className="rounded-2xl bg-white/10 border border-white/10 p-3">
-                  <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">Calls</p>
-                  <p className="text-lg font-extrabold">{searchStats.apiCalls || 0}</p>
-                </div>
+                <p className="mt-2 text-sm font-bold text-slate-900 dark:text-white">
+                  {leadCaptureRate}%
+                </p>
               </div>
             </div>
+            </div>
+
+            <div className="relative min-h-[260px] rounded-3xl border border-slate-200 dark:border-slate-800 bg-slate-950 text-white overflow-hidden shadow-2xl shadow-slate-300/40 dark:shadow-slate-950/40">
+              <div className="absolute inset-0 opacity-50 bg-[linear-gradient(rgba(148,163,184,0.12)_1px,transparent_1px),linear-gradient(90deg,rgba(148,163,184,0.12)_1px,transparent_1px)] bg-[size:28px_28px]" />
+              <div className="absolute -top-16 -right-12 h-44 w-44 rounded-full bg-cyan-400/20 blur-2xl" />
+              <div className="absolute -bottom-20 -left-16 h-52 w-52 rounded-full bg-violet-500/25 blur-2xl" />
+              <div className="relative h-full p-5 flex flex-col justify-between">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Coverage Scan</p>
+                    <p className="mt-1 text-lg font-extrabold">
+                      Lead Intelligence
+                    </p>
+                  </div>
+                  <div className="h-11 w-11 rounded-2xl bg-white/10 border border-white/10 flex items-center justify-center">
+                    <Radar className="w-5 h-5 text-cyan-300" />
+                  </div>
+                </div>
+
+                <div className="relative mx-auto my-2 h-32 w-32 rounded-full border border-cyan-300/40 flex items-center justify-center">
+                  <div className="absolute inset-4 rounded-full border border-violet-300/30" />
+                  <div className="absolute inset-9 rounded-full bg-cyan-300/20 border border-cyan-200/50" />
+                  <div className="absolute left-4 top-9 h-2.5 w-2.5 rounded-full bg-emerald-300 shadow-lg shadow-emerald-300/40" />
+                  <div className="absolute right-7 top-5 h-2 w-2 rounded-full bg-amber-300 shadow-lg shadow-amber-300/40" />
+                  <div className="absolute right-8 bottom-8 h-3 w-3 rounded-full bg-violet-300 shadow-lg shadow-violet-300/40" />
+                  <Crosshair className="relative w-7 h-7 text-white" />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="rounded-2xl bg-white/10 border border-white/10 p-3">
+                    <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">Leads</p>
+                    <p className="text-lg font-extrabold">{searchStats.totalPlaces}</p>
+                  </div>
+                  <div className="rounded-2xl bg-white/10 border border-white/10 p-3">
+                    <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">New</p>
+                    <p className="text-lg font-extrabold">{leadCaptureRate}%</p>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
       </section>
 
       {/* Main Search Component */}
@@ -284,7 +272,7 @@ const Dashboard = () => {
                 </div>
 
                 {/* Lead Tier Filter */}
-                <LeadTierFilter 
+                <LeadTierFilter
                   selectedTier={selectedTier}
                   onTierChange={setSelectedTier}
                 />
