@@ -144,7 +144,7 @@ const Dashboard = () => {
               </p>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1">
               <div className="rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white/80 dark:bg-slate-950/35 p-4">
                 <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
                   <ShieldCheck className="w-4 h-4 text-emerald-500" />
@@ -152,16 +152,6 @@ const Dashboard = () => {
                 </div>
                 <p className="mt-2 text-sm font-bold text-slate-900 dark:text-white">
                   {searchStats.totalPlaces > 0 ? `${100 - duplicateRate}% clean` : 'Ready'}
-                </p>
-              </div>
-
-              <div className="rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white/80 dark:bg-slate-950/35 p-4">
-                <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                  <Activity className="w-4 h-4 text-violet-500" />
-                  Lead Capture
-                </div>
-                <p className="mt-2 text-sm font-bold text-slate-900 dark:text-white">
-                  {leadCaptureRate}%
                 </p>
               </div>
             </div>
