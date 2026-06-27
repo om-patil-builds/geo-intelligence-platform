@@ -14,7 +14,7 @@ const getApiBaseUrl = () => {
 export const API_BASE_URL = getApiBaseUrl();
 
 export const DEFAULT_RADIUS = 10000; // in meters (10km)
-export const DEFAULT_MAX_RESULTS = 100;
+export const DEFAULT_MAX_RESULTS = 60;
 
 export const LEAD_TIER_COLORS = {
   high: 'bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-300 dark:border-red-800/50',

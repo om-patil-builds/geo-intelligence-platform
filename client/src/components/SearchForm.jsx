@@ -7,6 +7,7 @@ const SearchForm = ({ onSearch, loading, initialValues = {} }) => {
   const [location, setLocation] = useState(initialValues.location || initialValues.city || '');
   const [radius, setRadius] = useState(initialValues.radius !== undefined ? initialValues.radius : '');
   const [error, setError] = useState('');
+const [maxResults, setMaxResults] = useState(initialValues.maxResults !== undefined ? initialValues.maxResults : DEFAULT_MAX_RESULTS);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -124,7 +125,7 @@ const SearchForm = ({ onSearch, loading, initialValues = {} }) => {
             <input
               type="number"
               placeholder="max 60"
-              value={60}
+              value={maxResults}
               onChange={(e) => setMaxResults(e.target.value)}
               disabled={loading}
               min="1"
