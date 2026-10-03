@@ -19,6 +19,13 @@ const userSchema = new mongoose.Schema(
       required: true,
       minlength: 6,
     },
+    gmailSettings: {
+      email: { type: String, trim: true, lowercase: true, default: null },
+      appPassword: { type: String, default: null },
+      senderName: { type: String, trim: true, default: null },
+      isConnected: { type: Boolean, default: false },
+      lastTestedAt: { type: Date, default: null },
+    },
   },
   {
     timestamps: true,

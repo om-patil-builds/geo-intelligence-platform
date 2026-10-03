@@ -664,16 +664,94 @@ All email outreach routes are mounted under `/api/email` and require authenticat
   }
   ```
 
-### Get Email Campaign Progress
-- **Method**: GET
-- **Path**: `/api/email/campaigns/:id/progress`
+### Start Email Campaign
+- **Method**: POST
+- **Path**: `/api/email/campaigns/:id/start`
 - **Response** (200 OK):
   ```json
   {
     "success": true,
-    "campaign": { ... },
-    "progressPercent": 50,
-    "recentActivity": [ ... ]
+    "message": "Email dispatch started",
+    "campaign": { ... }
+  }
+  ```
+
+### Pause Email Campaign
+- **Method**: POST
+- **Path**: `/api/email/campaigns/:id/pause`
+- **Response** (200 OK):
+  ```json
+  {
+    "success": true,
+    "message": "Email campaign paused",
+    "campaign": { ... }
+  }
+  ```
+
+### Resume Email Campaign
+- **Method**: POST
+- **Path**: `/api/email/campaigns/:id/resume`
+- **Response** (200 OK):
+  ```json
+  {
+    "success": true,
+    "message": "Email campaign resumed",
+    "campaign": { ... }
+  }
+  ```
+
+### Stream Live Email Progress (Server-Sent Events)
+- **Method**: GET
+- **Path**: `/api/email/campaigns/:id/stream`
+- **Response** (text/event-stream):
+  - Streams real-time progress events every 2 seconds with stats and latest dispatched recipients.
+
+### Gmail Settings Endpoints
+
+#### Get Gmail Settings
+- **Method**: GET
+- **Path**: `/api/email/settings/gmail`
+- **Response** (200 OK):
+  ```json
+  {
+    "success": true,
+    "gmailSettings": {
+      "email": "user@gmail.com",
+      "senderName": "John Doe",
+      "isConnected": true,
+      "lastTestedAt": "2026-10-03T12:00:00.000Z"
+    }
+  }
+  ```
+
+#### Connect & Verify Gmail Account
+- **Method**: POST
+- **Path**: `/api/email/settings/gmail`
+- **Request Body**:
+  ```json
+  {
+    "email": "user@gmail.com",
+    "appPassword": "16-character-google-app-password",
+    "senderName": "John Doe"
+  }
+  ```
+- **Response** (200 OK):
+  ```json
+  {
+    "success": true,
+    "message": "Gmail account verified and connected successfully",
+    "gmailSettings": { ... }
+  }
+  ```
+
+#### Disconnect Gmail Account
+- **Method**: POST
+- **Path**: `/api/email/settings/disconnect-gmail`
+- **Response** (200 OK):
+  ```json
+  {
+    "success": true,
+    "message": "Gmail account disconnected successfully"
   }
   ```
 
