@@ -74,6 +74,52 @@ All authentication routes are mounted under `/api/auth`
   }
   ```
 
+### Refresh Token
+- **Method**: POST
+- **Path**: `/api/auth/refresh`
+- **Description**: Exchange an active refresh token for a new access token (15m) and rotated refresh token (7d)
+- **Cookies**: Optional `refreshToken` cookie
+- **Request Body** (optional if cookie sent):
+  ```json
+  {
+    "refreshToken": "string (optional if cookie is present)"
+  }
+  ```
+- **Response** (200 OK):
+  ```json
+  {
+    "success": true,
+    "message": "Token refreshed successfully",
+    "token": "new short-lived access token",
+    "refreshToken": "new rotated refresh token",
+    "user": {
+      "id": "user ObjectId",
+      "name": "user name",
+      "email": "user email"
+    }
+  }
+  ```
+
+### Logout User
+- **Method**: POST
+- **Path**: `/api/auth/logout`
+- **Description**: Invalidate active refresh token in database and clear auth cookie
+- **Cookies**: Optional `refreshToken` cookie
+- **Request Body** (optional if cookie sent):
+  ```json
+  {
+    "refreshToken": "string (optional if cookie is present)"
+  }
+  ```
+- **Response** (200 OK):
+  ```json
+  {
+    "success": true,
+    "message": "Logged out successfully"
+  }
+  ```
+
+
 ## Place Endpoints
 
 All place-related routes are mounted under `/api/places` and require authentication

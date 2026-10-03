@@ -1,5 +1,5 @@
-import jwt from "jsonwebtoken";
 import User from "../models/User.js";
+import { verifyAccessToken } from "../utils/generateToken.js";
 
 const authMiddleware = async (req, res, next) => {
   const authHeader = req.headers.authorization || "";
@@ -8,21 +8,29 @@ const authMiddleware = async (req, res, next) => {
   if (!token) {
     return res.status(401).json({
       success: false,
-      message: "Not authorized, no token",
+      code: "NO_TOKEN",
+      message: "Not authorized, no token provided",
     });
   }
 
   try {
-    if (!process.env.JWT_SECRET) {
-      throw new Error("JWT_SECRET is required");
+    const decoded = verifyAccessToken(token);
+
+    // Prevent using refresh token as access token
+    if (decoded.type && decoded.type !== "access") {
+      return res.status(401).json({
+        success: false,
+        code: "INVALID_TOKEN_TYPE",
+        message: "Not authorized, invalid token type",
+      });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const user = await User.findById(decoded.id).select("-password");
 
     if (!user) {
       return res.status(401).json({
         success: false,
+        code: "USER_NOT_FOUND",
         message: "Not authorized, user not found",
       });
     }
@@ -30,9 +38,11 @@ const authMiddleware = async (req, res, next) => {
     req.user = user;
     next();
   } catch (error) {
+    const isExpired = error.name === "TokenExpiredError";
     return res.status(401).json({
       success: false,
-      message: "Not authorized, token failed",
+      code: isExpired ? "TOKEN_EXPIRED" : "INVALID_TOKEN",
+      message: isExpired ? "Not authorized, token expired" : "Not authorized, token failed",
     });
   }
 };
