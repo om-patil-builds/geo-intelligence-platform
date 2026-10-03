@@ -1,29 +1,31 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Mail, Key, ShieldCheck, CheckCircle2, AlertCircle, X, Loader2, Unlink } from 'lucide-react';
+import { Mail, CheckCircle2, AlertCircle, X, Loader2, Unlink, ExternalLink, ShieldCheck, RefreshCw, UserCheck } from 'lucide-react';
 import emailService from '../services/emailService';
 
 const GmailSettingsModal = ({ isOpen, onClose, onSettingsUpdated }) => {
-  const [email, setEmail] = useState('');
-  const [appPassword, setAppPassword] = useState('');
+  const [account, setAccount] = useState(null);
   const [senderName, setSenderName] = useState('');
-  const [isConnected, setIsConnected] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
+  const [initiatingOAuth, setInitiatingOAuth] = useState(false);
+  const [updatingName, setUpdatingName] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
 
-  const fetchSettings = useCallback(async () => {
+  const fetchAccount = useCallback(async () => {
     setLoading(true);
+    setErrorMsg('');
     try {
-      const res = await emailService.getGmailSettings();
-      if (res.success && res.gmailSettings) {
-        setEmail(res.gmailSettings.email || '');
-        setSenderName(res.gmailSettings.senderName || '');
-        setIsConnected(Boolean(res.gmailSettings.isConnected));
+      const res = await emailService.getConnectedAccount();
+      if (res.success && res.connected && res.account) {
+        setAccount(res.account);
+        setSenderName(res.account.senderName || '');
+      } else {
+        setAccount(null);
+        setSenderName('');
       }
     } catch (err) {
-      console.error('Failed to load Gmail settings:', err);
+      console.error('Failed to load Gmail account:', err);
     } finally {
       setLoading(false);
     }
@@ -31,59 +33,57 @@ const GmailSettingsModal = ({ isOpen, onClose, onSettingsUpdated }) => {
 
   useEffect(() => {
     if (isOpen) {
-      fetchSettings();
+      fetchAccount();
     }
-  }, [isOpen, fetchSettings]);
+  }, [isOpen, fetchAccount]);
 
   if (!isOpen) return null;
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleConnectGoogle = async () => {
+    setInitiatingOAuth(true);
     setErrorMsg('');
-    setSuccessMsg('');
-
-    const cleanEmail = email.trim().toLowerCase();
-    const cleanPassword = appPassword.trim().replace(/\s+/g, '');
-    const cleanSender = senderName.trim();
-
-    if (!cleanEmail || !cleanPassword) {
-      setErrorMsg('Both Gmail address and 16-character Google App Password are required.');
-      return;
-    }
-
-    setSaving(true);
     try {
-      const res = await emailService.updateGmailSettings({
-        email: cleanEmail,
-        appPassword: cleanPassword,
-        senderName: cleanSender,
-      });
-
-      if (res.success) {
-        setIsConnected(true);
-        setAppPassword(''); // Clear password from input field
-        setSuccessMsg('Gmail connected and verified successfully!');
-        if (onSettingsUpdated) onSettingsUpdated(res.gmailSettings);
-        setTimeout(() => {
-          setSuccessMsg('');
-          onClose();
-        }, 1500);
+      const currentPath = window.location.pathname + window.location.search;
+      const res = await emailService.getGoogleAuthUrl(currentPath);
+      if (res.success && res.url) {
+        window.location.href = res.url;
       } else {
-        setErrorMsg(res.message || 'Failed to verify Gmail connection');
+        setErrorMsg('Failed to generate Google OAuth consent link. Check backend server configuration.');
+        setInitiatingOAuth(false);
       }
     } catch (err) {
       setErrorMsg(
         err.response?.data?.message ||
           err.message ||
-          'Failed to verify credentials. Please ensure 2-Step Verification is active and use a 16-character Google App Password.'
+          'Failed to initialize Google OAuth. Please check client credentials on backend.'
       );
+      setInitiatingOAuth(false);
+    }
+  };
+
+  const handleUpdateSenderName = async (e) => {
+    e.preventDefault();
+    if (!senderName.trim()) return;
+
+    setUpdatingName(true);
+    setErrorMsg('');
+    setSuccessMsg('');
+    try {
+      const res = await emailService.updateSenderName(senderName.trim());
+      if (res.success) {
+        setSuccessMsg('Sender display name updated!');
+        if (onSettingsUpdated) onSettingsUpdated({ ...account, senderName: res.senderName, isConnected: true });
+        setTimeout(() => setSuccessMsg(''), 2500);
+      }
+    } catch (err) {
+      setErrorMsg(err.response?.data?.message || err.message || 'Failed to update sender name');
     } finally {
-      setSaving(false);
+      setUpdatingName(false);
     }
   };
 
   const handleDisconnect = async () => {
-    if (!window.confirm('Are you sure you want to disconnect this Gmail account? Active email campaigns will be unable to dispatch.')) {
+    if (!window.confirm('Are you sure you want to disconnect this Gmail account? Active email campaigns will be stopped from dispatching.')) {
       return;
     }
 
@@ -91,13 +91,11 @@ const GmailSettingsModal = ({ isOpen, onClose, onSettingsUpdated }) => {
     setErrorMsg('');
     setSuccessMsg('');
     try {
-      const res = await emailService.disconnectGmail();
+      const res = await emailService.disconnectAccount();
       if (res.success) {
-        setIsConnected(false);
-        setEmail('');
+        setAccount(null);
         setSenderName('');
-        setAppPassword('');
-        setSuccessMsg('Gmail disconnected successfully.');
+        setSuccessMsg('Gmail account disconnected successfully.');
         if (onSettingsUpdated) onSettingsUpdated(null);
       }
     } catch (err) {
@@ -121,10 +119,10 @@ const GmailSettingsModal = ({ isOpen, onClose, onSettingsUpdated }) => {
             </div>
             <div>
               <h2 className="text-xl font-extrabold text-slate-900 dark:text-white">
-                Gmail Sender Settings
+                Gmail Integration
               </h2>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                Connect your Google account to automatically dispatch email outreach.
+                Google OAuth 2.0 &amp; Gmail REST API
               </p>
             </div>
           </div>
@@ -136,49 +134,7 @@ const GmailSettingsModal = ({ isOpen, onClose, onSettingsUpdated }) => {
           </button>
         </div>
 
-        {/* Connection Status Badge */}
-        <div className="mt-5 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-950/40 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            {isConnected ? (
-              <>
-                <div className="h-3 w-3 rounded-full bg-emerald-500 shadow-md shadow-emerald-500/50 animate-pulse" />
-                <div>
-                  <span className="text-xs font-bold text-slate-900 dark:text-white">
-                    Connected: {email}
-                  </span>
-                  <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold">
-                    Ready to send emails
-                  </p>
-                </div>
-              </>
-            ) : (
-              <>
-                <div className="h-3 w-3 rounded-full bg-amber-400" />
-                <div>
-                  <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
-                    Not Connected
-                  </span>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                    Connect a Gmail account below to start outreach
-                  </p>
-                </div>
-              </>
-            )}
-          </div>
-
-          {isConnected && (
-            <button
-              onClick={handleDisconnect}
-              disabled={disconnecting}
-              className="px-3 py-1.5 text-xs font-bold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-xl transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-            >
-              <Unlink className="w-3.5 h-3.5" />
-              <span>{disconnecting ? 'Disconnecting...' : 'Disconnect'}</span>
-            </button>
-          )}
-        </div>
-
-        {/* Notifications */}
+        {/* Notification alerts */}
         {errorMsg && (
           <div className="mt-4 p-3 rounded-2xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/50 flex items-center gap-2 text-xs text-red-600 dark:text-red-400">
             <AlertCircle className="w-4 h-4 shrink-0" />
@@ -193,104 +149,208 @@ const GmailSettingsModal = ({ isOpen, onClose, onSettingsUpdated }) => {
           </div>
         )}
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="mt-5 space-y-4">
-          <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
-              Gmail Address
-            </label>
-            <input
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="e.g. yourname@gmail.com"
-              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
-            />
+        {/* Loading state */}
+        {loading ? (
+          <div className="py-12 flex flex-col items-center justify-center gap-3">
+            <Loader2 className="w-8 h-8 text-emerald-500 animate-spin" />
+            <p className="text-xs font-semibold text-slate-500">Checking Gmail OAuth status...</p>
           </div>
+        ) : account && account.isConnected ? (
+          /* CONNECTED STATE */
+          <div className="mt-5 space-y-5">
+            {/* Account Card */}
+            <div className="p-4 rounded-2xl border border-emerald-200 dark:border-emerald-900/50 bg-emerald-50/60 dark:bg-emerald-950/20 flex items-center justify-between">
+              <div className="flex items-center gap-3.5">
+                {account.picture ? (
+                  <img
+                    src={account.picture}
+                    alt={account.senderName || account.email}
+                    className="w-11 h-11 rounded-full border-2 border-emerald-400 shadow-sm"
+                  />
+                ) : (
+                  <div className="w-11 h-11 rounded-full bg-emerald-600 text-white font-bold flex items-center justify-center text-sm uppercase shadow-sm">
+                    {account.email.charAt(0)}
+                  </div>
+                )}
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-extrabold text-slate-900 dark:text-white">
+                      {account.email}
+                    </span>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-900/80 dark:text-emerald-300">
+                      OAuth 2.0
+                    </span>
+                  </div>
+                  <p className="text-xs text-emerald-700 dark:text-emerald-400 font-medium mt-0.5 flex items-center gap-1.5">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    Authorized for Gmail API email dispatch
+                  </p>
+                </div>
+              </div>
 
-          <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
-              Sender Name (Display Name)
-            </label>
-            <input
-              type="text"
-              value={senderName}
-              onChange={(e) => setSenderName(e.target.value)}
-              placeholder="e.g. Jane Doe - Partnerships"
-              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
-            />
-          </div>
-
-          <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <label className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                Google App Password (16 characters)
-              </label>
-              <a
-                href="https://myaccount.google.com/apppasswords"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 hover:underline"
+              <button
+                onClick={handleDisconnect}
+                disabled={disconnecting}
+                className="px-3 py-1.5 text-xs font-bold text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-950/40 rounded-xl transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50 shrink-0"
               >
-                Generate Password ↗
-              </a>
+                <Unlink className="w-3.5 h-3.5" />
+                <span>{disconnecting ? 'Disconnecting...' : 'Disconnect'}</span>
+              </button>
             </div>
-            <div className="relative">
-              <input
-                type="password"
-                required
-                value={appPassword}
-                onChange={(e) => setAppPassword(e.target.value)}
-                placeholder="xxxx xxxx xxxx xxxx"
-                className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-sm text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500"
-              />
-              <Key className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+
+            {/* Sender Name Form */}
+            <form onSubmit={handleUpdateSenderName} className="space-y-3">
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
+                  Sender Display Name
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    required
+                    value={senderName}
+                    onChange={(e) => setSenderName(e.target.value)}
+                    placeholder="e.g. Sarah Connor - Business Dev"
+                    className="flex-1 px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                  <button
+                    type="submit"
+                    disabled={updatingName || !senderName.trim()}
+                    className="px-4 py-2.5 text-xs font-bold text-white bg-slate-900 dark:bg-slate-800 hover:bg-slate-800 dark:hover:bg-slate-700 rounded-xl transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50 shrink-0"
+                  >
+                    {updatingName ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <UserCheck className="w-3.5 h-3.5" />}
+                    <span>Save</span>
+                  </button>
+                </div>
+                <p className="text-[11px] text-slate-400 mt-1">
+                  This is the friendly name recipients see in their inbox alongside your Gmail address.
+                </p>
+              </div>
+            </form>
+
+            {/* Security Badge */}
+            <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-950/40 border border-slate-200/80 dark:border-slate-800/80 text-[11px] text-slate-500 dark:text-slate-400 space-y-1.5">
+              <div className="flex items-center gap-1.5 font-bold text-slate-700 dark:text-slate-300">
+                <ShieldCheck className="w-4 h-4 text-emerald-500" />
+                <span>Enterprise Token Security</span>
+              </div>
+              <p className="leading-relaxed">
+                Your account is linked using Google OAuth 2.0 with the official Gmail REST API. Refresh tokens are AES-256-GCM encrypted on the server and access tokens automatically rotate.
+              </p>
+            </div>
+
+            {/* Switch Account */}
+            <div className="pt-2 flex justify-between items-center border-t border-slate-100 dark:border-slate-800">
+              <button
+                type="button"
+                onClick={handleConnectGoogle}
+                disabled={initiatingOAuth}
+                className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1.5 cursor-pointer"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                <span>Switch / Re-authorize Google Account</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2 text-xs font-bold text-white bg-slate-900 dark:bg-slate-800 hover:bg-slate-800 dark:hover:bg-slate-700 rounded-xl transition cursor-pointer"
+              >
+                Done
+              </button>
             </div>
           </div>
-
-          {/* Setup Instructions Box */}
-          <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-950/40 border border-slate-200/80 dark:border-slate-800/80 text-[11px] text-slate-500 dark:text-slate-400 space-y-1.5">
-            <div className="flex items-center gap-1.5 font-bold text-slate-700 dark:text-slate-300">
-              <ShieldCheck className="w-4 h-4 text-emerald-500" />
-              <span>How to generate a Google App Password:</span>
+        ) : (
+          /* NOT CONNECTED STATE */
+          <div className="mt-5 space-y-5">
+            <div className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-950/40 space-y-2">
+              <div className="flex items-center gap-2">
+                <div className="h-2.5 w-2.5 rounded-full bg-amber-400" />
+                <span className="text-xs font-bold text-slate-900 dark:text-white">
+                  No Gmail Account Connected
+                </span>
+              </div>
+              <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+                Connect your Google account in one click. GeoIntel uses the official Gmail REST API to dispatch personalized campaigns with high deliverability.
+              </p>
             </div>
-            <ol className="list-decimal pl-4 space-y-1 leading-relaxed">
-              <li>Turn on 2-Step Verification in your Google Account.</li>
-              <li>Visit <span className="font-mono text-slate-700 dark:text-slate-300">myaccount.google.com/apppasswords</span>.</li>
-              <li>Create a new App Password named &quot;GeoIntel&quot;.</li>
-              <li>Copy the 16-character code and paste it above.</li>
-            </ol>
-          </div>
 
-          {/* Action Buttons */}
-          <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+            {/* Google OAuth Button */}
             <button
               type="button"
-              onClick={onClose}
-              className="px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition cursor-pointer"
+              onClick={handleConnectGoogle}
+              disabled={initiatingOAuth}
+              className="w-full py-3.5 px-4 rounded-2xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 hover:bg-slate-50 dark:hover:bg-slate-900 text-slate-800 dark:text-white font-bold text-sm shadow-sm hover:shadow-md transition flex items-center justify-center gap-3 cursor-pointer disabled:opacity-60"
             >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={saving || loading}
-              className="px-5 py-2.5 text-xs font-bold text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 rounded-xl shadow-md shadow-emerald-500/20 hover:shadow-emerald-500/30 transition flex items-center gap-2 cursor-pointer disabled:opacity-50"
-            >
-              {saving ? (
+              {initiatingOAuth ? (
                 <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Verifying SMTP...</span>
+                  <Loader2 className="w-5 h-5 text-emerald-500 animate-spin" />
+                  <span>Connecting to Google...</span>
                 </>
               ) : (
                 <>
-                  <CheckCircle2 className="w-4 h-4" />
-                  <span>{isConnected ? 'Update & Re-verify' : 'Verify & Connect Gmail'}</span>
+                  {/* Google SVG Logo */}
+                  <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24">
+                    <path
+                      fill="#4285F4"
+                      d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                    />
+                    <path
+                      fill="#34A853"
+                      d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                    />
+                    <path
+                      fill="#FBBC05"
+                      d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+                    />
+                    <path
+                      fill="#EA4335"
+                      d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+                    />
+                  </svg>
+                  <span>Connect with Google</span>
+                  <ExternalLink className="w-4 h-4 text-slate-400" />
                 </>
               )}
             </button>
+
+            {/* Security Perks */}
+            <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-950/40 border border-slate-200/80 dark:border-slate-800/80 text-[11px] text-slate-500 dark:text-slate-400 space-y-2">
+              <div className="flex items-center gap-1.5 font-bold text-slate-700 dark:text-slate-300">
+                <ShieldCheck className="w-4 h-4 text-emerald-500" />
+                <span>Zero Passwords Required</span>
+              </div>
+              <ul className="space-y-1.5 pl-1">
+                <li className="flex items-center gap-2">
+                  <span className="text-emerald-500 font-bold">✓</span>
+                  <span>Direct Google OAuth 2.0 authorization</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="text-emerald-500 font-bold">✓</span>
+                  <span>No App Passwords or SMTP credentials stored</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="text-emerald-500 font-bold">✓</span>
+                  <span>AES-256-GCM backend encrypted refresh tokens</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="text-emerald-500 font-bold">✓</span>
+                  <span>Revoke access anytime from your Google security dashboard</span>
+                </li>
+              </ul>
+            </div>
+
+            <div className="flex justify-end pt-2 border-t border-slate-100 dark:border-slate-800">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
           </div>
-        </form>
+        )}
       </div>
     </div>
   );

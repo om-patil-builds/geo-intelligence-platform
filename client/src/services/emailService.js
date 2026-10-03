@@ -154,26 +154,55 @@ const emailService = {
   },
 
   /**
-   * Get user's Gmail configuration
+   * Get Google OAuth consent URL for 1-click authorization
+   */
+  getGoogleAuthUrl: async (returnUrl = window.location.pathname) => {
+    const response = await api.get('/email/oauth/google/url', {
+      params: {
+        returnUrl,
+        clientOrigin: window.location.origin,
+      },
+    });
+    return response.data;
+  },
+
+  /**
+   * Get user's connected Gmail OAuth account
+   */
+  getConnectedAccount: async () => {
+    const response = await api.get('/email/account');
+    return response.data;
+  },
+
+  /**
+   * Disconnect user's Gmail OAuth account
+   */
+  disconnectAccount: async () => {
+    const response = await api.post('/email/account/disconnect');
+    return response.data;
+  },
+
+  /**
+   * Update sender display name
+   */
+  updateSenderName: async (senderName) => {
+    const response = await api.put('/email/account/sender-name', { senderName });
+    return response.data;
+  },
+
+  /**
+   * Get user's Gmail configuration (backward-compatible)
    */
   getGmailSettings: async () => {
-    const response = await api.get('/email/settings/gmail');
+    const response = await api.get('/email/account');
     return response.data;
   },
 
   /**
-   * Connect or update user's Gmail account with Google App Password
-   */
-  updateGmailSettings: async (data) => {
-    const response = await api.post('/email/settings/gmail', data);
-    return response.data;
-  },
-
-  /**
-   * Disconnect user's Gmail account
+   * Disconnect user's Gmail account (backward-compatible)
    */
   disconnectGmail: async () => {
-    const response = await api.post('/email/settings/disconnect-gmail');
+    const response = await api.post('/email/account/disconnect');
     return response.data;
   },
 };

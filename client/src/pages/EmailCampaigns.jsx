@@ -21,6 +21,7 @@ import {
   FileEdit,
   Save,
   Loader2,
+  X,
 } from 'lucide-react';
 import emailService from '../services/emailService';
 import LoadingSpinner from '../components/LoadingSpinner';
@@ -55,9 +56,10 @@ const EmailCampaigns = () => {
   const [actionLoading, setActionLoading] = useState(false);
   const [copiedEmail, setCopiedEmail] = useState(null);
 
-  // Gmail Settings
+  // Gmail OAuth Settings & Alerts
   const [gmailSettings, setGmailSettings] = useState(null);
   const [isGmailModalOpen, setIsGmailModalOpen] = useState(false);
+  const [oauthBanner, setOauthBanner] = useState(null);
 
   // Template editing state
   const [isEditingTemplate, setIsEditingTemplate] = useState(false);
@@ -72,17 +74,54 @@ const EmailCampaigns = () => {
   const [newCategory, setNewCategory] = useState('');
   const [creatingCampaign, setCreatingCampaign] = useState(false);
 
-  // Fetch Gmail settings
+  // Fetch Gmail OAuth account status
   const loadGmailSettings = useCallback(async () => {
     try {
-      const data = await emailService.getGmailSettings();
-      if (data.success) {
-        setGmailSettings(data.gmailSettings);
+      const data = await emailService.getConnectedAccount();
+      if (data.success && data.connected && data.account) {
+        setGmailSettings({
+          ...data.account,
+          isConnected: true,
+        });
+      } else {
+        setGmailSettings(null);
       }
     } catch (err) {
-      console.error('Failed to load Gmail settings:', err);
+      console.error('Failed to load Gmail account:', err);
     }
   }, []);
+
+  // Listen for Google OAuth redirect query params (?gmail_connected=true or ?gmail_error=...)
+  useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    const gmailConnected = searchParams.get('gmail_connected');
+    const gmailError = searchParams.get('gmail_error');
+    const emailParam = searchParams.get('email');
+
+    if (gmailConnected === 'true') {
+      setOauthBanner({
+        type: 'success',
+        message: `Google account ${emailParam ? `(${emailParam}) ` : ''}connected successfully via OAuth 2.0! Ready for Gmail API dispatch.`,
+      });
+      loadGmailSettings();
+
+      searchParams.delete('gmail_connected');
+      if (emailParam) searchParams.delete('email');
+      const newQuery = searchParams.toString();
+      const newUrl = window.location.pathname + (newQuery ? `?${newQuery}` : '');
+      window.history.replaceState({}, '', newUrl);
+    } else if (gmailError) {
+      setOauthBanner({
+        type: 'error',
+        message: `Google authorization failed: ${decodeURIComponent(gmailError)}`,
+      });
+
+      searchParams.delete('gmail_error');
+      const newQuery = searchParams.toString();
+      const newUrl = window.location.pathname + (newQuery ? `?${newQuery}` : '');
+      window.history.replaceState({}, '', newUrl);
+    }
+  }, [loadGmailSettings]);
 
   // Load campaigns list
   const loadCampaigns = useCallback(async () => {
@@ -304,12 +343,46 @@ const EmailCampaigns = () => {
 
   return (
     <div className="space-y-6">
+      {/* OAuth Redirect Notification Banner */}
+      {oauthBanner && (
+        <div
+          className={`p-4 rounded-2xl border flex items-center justify-between gap-3 text-xs font-semibold ${
+            oauthBanner.type === 'success'
+              ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300'
+              : 'bg-red-50 dark:bg-red-950/40 border-red-200 dark:border-red-800 text-red-800 dark:text-red-300'
+          }`}
+        >
+          <div className="flex items-center gap-2.5">
+            {oauthBanner.type === 'success' ? (
+              <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+            ) : (
+              <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400 shrink-0" />
+            )}
+            <span>{oauthBanner.message}</span>
+          </div>
+          <button
+            onClick={() => setOauthBanner(null)}
+            className="p-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition cursor-pointer"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
       {/* Top Banner: Gmail Sender Account Status */}
       <div className="p-4 sm:p-5 rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="p-3 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-600 text-white shadow-md shadow-emerald-500/20">
-            <Mail className="w-5 h-5" />
-          </div>
+        <div className="flex items-center gap-3.5">
+          {gmailSettings?.picture ? (
+            <img
+              src={gmailSettings.picture}
+              alt={gmailSettings.email}
+              className="w-11 h-11 rounded-2xl border border-emerald-300 shadow-sm shrink-0"
+            />
+          ) : (
+            <div className="p-3 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-600 text-white shadow-md shadow-emerald-500/20 shrink-0">
+              <Mail className="w-5 h-5" />
+            </div>
+          )}
           <div>
             <div className="flex items-center gap-2">
               <h2 className="text-sm font-extrabold text-slate-900 dark:text-white">
@@ -328,8 +401,8 @@ const EmailCampaigns = () => {
             </div>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
               {gmailSettings?.isConnected
-                ? 'Your Gmail account is verified and ready to dispatch sequences via Google SMTP.'
-                : 'Connect your Gmail account with a 16-character App Password to enable automated email dispatch.'}
+                ? 'Connected via official Google OAuth 2.0 (Gmail REST API).'
+                : 'Connect your Google account via OAuth 2.0 to enable direct email dispatch with high deliverability. No passwords required.'}
             </p>
           </div>
         </div>
@@ -339,7 +412,7 @@ const EmailCampaigns = () => {
           className="w-full sm:w-auto px-4 py-2 text-xs font-bold text-slate-700 dark:text-slate-200 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700/80 rounded-xl transition flex items-center justify-center gap-2 cursor-pointer shrink-0"
         >
           <Sliders className="w-4 h-4 text-emerald-500" />
-          <span>{gmailSettings?.isConnected ? 'Sender Settings' : 'Connect Gmail Account'}</span>
+          <span>{gmailSettings?.isConnected ? 'Google Account' : 'Connect Gmail'}</span>
         </button>
       </div>
 
@@ -705,7 +778,7 @@ const EmailCampaigns = () => {
                 Email Outreach Campaigns
               </h1>
               <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
-                Automate personalized cold email dispatches to scraped business leads using authenticated Gmail SMTP.
+                Automate personalized cold email dispatches to scraped business leads using official Gmail API and Google OAuth 2.0.
               </p>
             </div>
 

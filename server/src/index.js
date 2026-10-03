@@ -1,3 +1,4 @@
+// Server entry point - updated for Gmail OAuth
 import "dotenv/config";
 import app from "./app.js";
 import connectDB from "./config/database.js";

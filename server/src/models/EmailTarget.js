@@ -69,6 +69,26 @@ const emailTargetSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
+    // Gmail API & Inbox Thread tracking
+    gmailMessageId: {
+      type: String,
+      default: null,
+      index: true,
+    },
+    gmailThreadId: {
+      type: String,
+      default: null,
+      index: true,
+    },
+    idempotencyKey: {
+      type: String,
+      default: null,
+      index: true,
+    },
+    inReplyTo: {
+      type: String,
+      default: null,
+    },
   },
   {
     timestamps: true,
@@ -79,5 +99,11 @@ const emailTargetSchema = new mongoose.Schema(
 emailTargetSchema.index({ campaign: 1, status: 1, createdAt: 1 });
 // Enforce unique recipient per campaign to prevent duplicate emails
 emailTargetSchema.index({ campaign: 1, recipientEmail: 1 }, { unique: true });
+// Idempotency index
+emailTargetSchema.index({ campaign: 1, idempotencyKey: 1 }, { sparse: true });
 
-export default mongoose.model("EmailTarget", emailTargetSchema);
+const EmailTarget = mongoose.model("EmailTarget", emailTargetSchema);
+
+export const CampaignContact = EmailTarget;
+export const EmailJob = EmailTarget;
+export default EmailTarget;

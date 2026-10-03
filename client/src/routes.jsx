@@ -59,6 +59,8 @@ const AppRoutes = () => {
           <Route path="scraping/:id" element={<ScrapingCampaigns />} />
           <Route path="email" element={<EmailCampaigns />} />
           <Route path="email/:id" element={<EmailCampaigns />} />
+          <Route path="campaigns" element={<EmailCampaigns />} />
+          <Route path="campaigns/:id" element={<EmailCampaigns />} />
         </Route>
 
         {/* 404 Route */}

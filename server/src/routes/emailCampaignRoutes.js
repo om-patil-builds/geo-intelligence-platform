@@ -12,6 +12,11 @@ import {
   resumeEmailCampaignHandler,
   getEmailCampaignProgress,
   streamEmailCampaignProgress,
+  getGoogleAuthUrlHandler,
+  handleGoogleAuthCallback,
+  getConnectedAccountHandler,
+  disconnectAccountHandler,
+  updateSenderNameHandler,
   getGmailSettingsHandler,
   updateGmailSettingsHandler,
   disconnectGmailHandler,
@@ -19,7 +24,17 @@ import {
 
 const router = express.Router();
 
+// Public OAuth callback from Google consent redirect (identified via signed state token)
+router.get("/oauth/google/callback", handleGoogleAuthCallback);
+
+// All subsequent routes require JWT authentication
 router.use(authMiddleware);
+
+// Google OAuth & Account Management
+router.get("/oauth/google/url", getGoogleAuthUrlHandler);
+router.get("/account", getConnectedAccountHandler);
+router.post("/account/disconnect", disconnectAccountHandler);
+router.put("/account/sender-name", updateSenderNameHandler);
 
 // Campaign CRUD
 router.post("/campaigns", createEmailCampaign);
@@ -38,9 +53,10 @@ router.post("/campaigns/:id/resume", resumeEmailCampaignHandler);
 router.get("/campaigns/:id/progress", getEmailCampaignProgress);
 router.get("/campaigns/:id/stream", streamEmailCampaignProgress);
 
-// Gmail User Configuration
+// Backward-compatibility aliases for legacy routes
 router.get("/settings/gmail", getGmailSettingsHandler);
 router.post("/settings/gmail", updateGmailSettingsHandler);
 router.post("/settings/disconnect-gmail", disconnectGmailHandler);
 
 export default router;
+

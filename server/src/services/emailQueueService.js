@@ -69,7 +69,7 @@ export const recoverStaleSendingJobs = async (campaignId, staleMinutes = 5) => {
 /**
  * Mark email target as successfully sent
  */
-export const markEmailSent = async (targetId) => {
+export const markEmailSent = async (targetId, { gmailMessageId, gmailThreadId } = {}) => {
   return await EmailTarget.findByIdAndUpdate(
     targetId,
     {
@@ -77,6 +77,8 @@ export const markEmailSent = async (targetId) => {
         status: "sent",
         sentAt: new Date(),
         errorMessage: null,
+        gmailMessageId: gmailMessageId || null,
+        gmailThreadId: gmailThreadId || null,
       },
     },
     { new: true }
@@ -201,6 +203,7 @@ export const importScrapedLeadsToCampaign = async (
                 website: st.websiteUrl,
                 status: "pending",
                 attempts: 0,
+                idempotencyKey: `${emailCampaignId}_${emailStr}`,
               },
             },
             upsert: true,

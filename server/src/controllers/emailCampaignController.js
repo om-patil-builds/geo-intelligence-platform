@@ -1,5 +1,6 @@
 import EmailCampaign from "../models/EmailCampaign.js";
 import EmailTarget from "../models/EmailTarget.js";
+import EmailAccount from "../models/EmailAccount.js";
 import User from "../models/User.js";
 import asyncHandler from "../utils/asyncHandler.js";
 import {
@@ -12,7 +13,11 @@ import {
   resumeEmailCampaign,
   isEmailCampaignRunning,
 } from "../services/emailWorkerService.js";
-import { verifyGmailAccount } from "../services/gmailDispatcherService.js";
+import {
+  getAuthorizationUrl,
+  handleOAuthCallback,
+} from "../services/gmailApiService.js";
+import { encryptText } from "../utils/cryptoUtils.js";
 
 /**
  * Create a new Email Outreach Campaign
@@ -395,90 +400,261 @@ export const streamEmailCampaignProgress = asyncHandler(async (req, res) => {
 });
 
 /**
- * Get user's current Gmail settings
- * GET /api/email/settings/gmail
+ * Get Google OAuth Authorization URL
+ * GET /api/email/oauth/google/url
  */
-export const getGmailSettingsHandler = asyncHandler(async (req, res) => {
-  const user = await User.findById(req.user._id).select("gmailSettings");
+export const getGoogleAuthUrlHandler = asyncHandler(async (req, res) => {
+  const returnUrl = req.query.returnUrl || "/email";
 
-  res.status(200).json({
-    success: true,
-    gmailSettings: {
-      email: user?.gmailSettings?.email || null,
-      senderName: user?.gmailSettings?.senderName || null,
-      isConnected: Boolean(user?.gmailSettings?.isConnected),
-      lastTestedAt: user?.gmailSettings?.lastTestedAt || null,
-    },
+  let clientOrigin = req.query.clientOrigin || req.headers.origin;
+  if (!clientOrigin && req.headers.referer) {
+    try {
+      clientOrigin = new URL(req.headers.referer).origin;
+    } catch {
+      // ignore
+    }
+  }
+
+  // Ensure localhost URLs use http instead of https
+  if (clientOrigin && (clientOrigin.startsWith("https://localhost") || clientOrigin.startsWith("https://127.0.0.1"))) {
+    clientOrigin = clientOrigin.replace(/^https:/, "http:");
+  }
+
+  const url = getAuthorizationUrl({
+    userId: req.user._id.toString(),
+    returnUrl,
+    clientOrigin,
   });
+
+  res.status(200).json({ success: true, url });
 });
 
 /**
- * Configure and verify user's Gmail App Password
- * POST /api/email/settings/gmail
+ * Handle Google OAuth callback redirect from Google consent screen
+ * GET /api/email/oauth/google/callback
+ * (Public endpoint - user is authenticated via state token)
  */
-export const updateGmailSettingsHandler = asyncHandler(async (req, res) => {
-  const email = String(req.body.email || "").trim().toLowerCase();
-  const appPassword = String(req.body.appPassword || "").trim();
-  const senderName = String(req.body.senderName || "").trim();
+export const handleGoogleAuthCallback = asyncHandler(async (req, res) => {
+  const { code, state, error } = req.query;
 
-  if (!email || !appPassword) {
-    const error = new Error("Gmail address and App Password are required");
-    error.statusCode = 400;
-    throw error;
+  let parsedState = {};
+  if (state) {
+    try {
+      const decodedStr = Buffer.from(decodeURIComponent(state), "base64url").toString("utf-8");
+      parsedState = JSON.parse(decodedStr);
+    } catch {
+      try {
+        const decodedStr = Buffer.from(state, "base64url").toString("utf-8");
+        parsedState = JSON.parse(decodedStr);
+      } catch (e2) {
+        console.error("Failed to parse OAuth state:", e2.message, "raw state:", state);
+      }
+    }
   }
 
-  // Verify against Google SMTP
-  try {
-    await verifyGmailAccount(email, appPassword);
-  } catch (verifyErr) {
-    const error = new Error(
-      `Gmail authentication failed: ${verifyErr.message || "Invalid credentials"}. Please ensure 2-Step Verification is enabled and use a 16-character Google App Password.`
+  // Resolve client frontend base URL safely
+  let clientBase = parsedState.clientOrigin;
+  if (!clientBase) {
+    const origins = (process.env.CLIENT_URL || "http://localhost:5173")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+    const isLocalServer =
+      (process.env.SERVER_URL || "").includes("localhost") ||
+      (process.env.PORT || "5000") === "5000" ||
+      process.env.NODE_ENV !== "production";
+
+    if (isLocalServer) {
+      clientBase = origins.find((o) => o.includes("localhost") || o.includes("127.0.0.1")) || "http://localhost:5173";
+    } else {
+      clientBase = origins[0] || "http://localhost:5173";
+    }
+  }
+
+  // Ensure localhost uses http (Vite dev server default)
+  if (clientBase.startsWith("https://localhost") || clientBase.startsWith("https://127.0.0.1")) {
+    clientBase = clientBase.replace(/^https:/, "http:");
+  }
+  clientBase = clientBase.replace(/\/+$/, "");
+
+  const rawReturnUrl = parsedState.returnUrl || "/email";
+  const targetRedirect = rawReturnUrl.startsWith("/") ? rawReturnUrl : `/${rawReturnUrl}`;
+  const separator = targetRedirect.includes("?") ? "&" : "?";
+
+  if (error || !code) {
+    const errorMsg = encodeURIComponent(error || "Authorization was denied");
+    return res.redirect(`${clientBase}${targetRedirect}${separator}gmail_error=${errorMsg}`);
+  }
+
+  const userId = parsedState.userId;
+
+  if (!userId) {
+    return res.redirect(
+      `${clientBase}${targetRedirect}${separator}gmail_error=${encodeURIComponent(
+        "Missing user identification in state"
+      )}`
     );
-    error.statusCode = 400;
-    throw error;
   }
 
-  const user = await User.findById(req.user._id);
-  user.gmailSettings = {
-    email,
-    appPassword,
-    senderName: senderName || user.name,
+  try {
+    const { tokens, profile } = await handleOAuthCallback(code);
+
+    // Encrypt refresh token if present
+    const encryptedRefreshToken = tokens.refresh_token ? encryptText(tokens.refresh_token) : undefined;
+    const expiryDate = tokens.expiry_date ? new Date(tokens.expiry_date) : new Date(Date.now() + 3600 * 1000);
+
+    const updateData = {
+      user: userId,
+      email: profile.email.toLowerCase(),
+      senderName: profile.name || profile.email,
+      googleId: profile.sub || profile.id,
+      picture: profile.picture,
+      accessToken: tokens.access_token,
+      tokenExpiry: expiryDate,
+      scope: tokens.scope ? tokens.scope.split(" ") : [],
+      isConnected: true,
+      lastSyncedAt: new Date(),
+    };
+
+    if (encryptedRefreshToken) {
+      updateData.encryptedRefreshToken = encryptedRefreshToken;
+    }
+
+    await EmailAccount.findOneAndUpdate(
+      { user: userId, email: profile.email.toLowerCase() },
+      { $set: updateData },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+
+    // Update user summary settings
+    await User.findByIdAndUpdate(userId, {
+      "gmailSettings.isConnected": true,
+      "gmailSettings.email": profile.email.toLowerCase(),
+      "gmailSettings.senderName": profile.name || profile.email,
+    });
+
+    return res.redirect(`${clientBase}${targetRedirect}${separator}gmail_connected=true&email=${encodeURIComponent(profile.email)}`);
+  } catch (authErr) {
+    console.error("Google OAuth callback error:", authErr);
+    return res.redirect(`${clientBase}${targetRedirect}${separator}gmail_error=${encodeURIComponent(authErr.message || "Failed to link Gmail account")}`);
+  }
+});
+
+/**
+ * Get user's connected Gmail OAuth account
+ * GET /api/email/account
+ */
+export const getConnectedAccountHandler = asyncHandler(async (req, res) => {
+  const account = await EmailAccount.findOne({
+    user: req.user._id,
     isConnected: true,
-    lastTestedAt: new Date(),
-  };
-  await user.save();
+  }).sort({ updatedAt: -1 });
+
+  if (!account) {
+    return res.status(200).json({
+      success: true,
+      connected: false,
+      account: null,
+    });
+  }
 
   res.status(200).json({
     success: true,
-    message: "Gmail account verified and connected successfully",
-    gmailSettings: {
-      email: user.gmailSettings.email,
-      senderName: user.gmailSettings.senderName,
-      isConnected: true,
-      lastTestedAt: user.gmailSettings.lastTestedAt,
+    connected: true,
+    account: {
+      id: account._id,
+      email: account.email,
+      senderName: account.senderName,
+      picture: account.picture,
+      isConnected: account.isConnected,
+      lastSyncedAt: account.lastSyncedAt,
+      createdAt: account.createdAt,
     },
   });
 });
 
 /**
  * Disconnect Gmail account
- * POST /api/email/settings/disconnect-gmail
+ * POST /api/email/account/disconnect
  */
-export const disconnectGmailHandler = asyncHandler(async (req, res) => {
-  const user = await User.findById(req.user._id);
-  if (user) {
-    user.gmailSettings = {
-      email: null,
-      appPassword: null,
-      senderName: null,
-      isConnected: false,
-      lastTestedAt: null,
-    };
-    await user.save();
-  }
+export const disconnectAccountHandler = asyncHandler(async (req, res) => {
+  await EmailAccount.updateMany(
+    { user: req.user._id },
+    { $set: { isConnected: false, accessToken: null } }
+  );
+
+  await User.findByIdAndUpdate(req.user._id, {
+    "gmailSettings.isConnected": false,
+    "gmailSettings.email": null,
+    "gmailSettings.appPassword": null,
+  });
 
   res.status(200).json({
     success: true,
     message: "Gmail account disconnected successfully",
   });
 });
+
+/**
+ * Update sender display name
+ * PUT /api/email/account/sender-name
+ */
+export const updateSenderNameHandler = asyncHandler(async (req, res) => {
+  const senderName = String(req.body.senderName || "").trim();
+  if (!senderName) {
+    const error = new Error("Sender name cannot be empty");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const account = await EmailAccount.findOneAndUpdate(
+    { user: req.user._id, isConnected: true },
+    { $set: { senderName } },
+    { new: true }
+  );
+
+  if (!account) {
+    const error = new Error("No connected Gmail account found");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  await User.findByIdAndUpdate(req.user._id, {
+    "gmailSettings.senderName": senderName,
+  });
+
+  res.status(200).json({
+    success: true,
+    message: "Sender name updated",
+    senderName: account.senderName,
+  });
+});
+
+// Backward-compatibility aliases for legacy routes
+export const getGmailSettingsHandler = asyncHandler(async (req, res) => {
+  const account = await EmailAccount.findOne({
+    user: req.user._id,
+    isConnected: true,
+  }).sort({ updatedAt: -1 });
+
+  res.status(200).json({
+    success: true,
+    gmailSettings: {
+      email: account?.email || null,
+      senderName: account?.senderName || null,
+      isConnected: Boolean(account?.isConnected),
+      picture: account?.picture || null,
+      lastTestedAt: account?.lastSyncedAt || null,
+    },
+  });
+});
+
+export const updateGmailSettingsHandler = asyncHandler(async (req, res) => {
+  const error = new Error("Legacy SMTP/password configuration has been replaced by Gmail OAuth 2.0. Please connect your account with Google.");
+  error.statusCode = 400;
+  throw error;
+});
+
+export const disconnectGmailHandler = disconnectAccountHandler;
+
