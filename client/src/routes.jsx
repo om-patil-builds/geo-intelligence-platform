@@ -7,6 +7,7 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import SearchHistory from './pages/SearchHistory';
 import HistoryResults from './pages/HistoryResults';
+import ScrapingCampaigns from './pages/ScrapingCampaigns';
 import FAQ from './pages/FAQ';
 import Pricing from './pages/Pricing';
 import NotFound from './pages/NotFound';
@@ -53,6 +54,8 @@ const AppRoutes = () => {
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="history" element={<SearchHistory />} />
           <Route path="history/:id" element={<HistoryResults />} />
+          <Route path="scraping" element={<ScrapingCampaigns />} />
+          <Route path="scraping/:id" element={<ScrapingCampaigns />} />
         </Route>
 
         {/* 404 Route */}

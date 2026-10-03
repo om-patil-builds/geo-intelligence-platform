@@ -9,12 +9,14 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import ErrorMessage from '../components/ErrorMessage';
 import EmptyState from '../components/EmptyState';
 import LeadTierFilter from '../components/LeadTierFilter';
+import AddToScrapingCampaignModal from '../components/AddToScrapingCampaignModal';
 import {
   Activity,
   BarChart3,
   Building2,
   Crosshair,
   Database,
+  Globe,
   LayoutGrid,
   MapPinned,
   Radar,
@@ -61,7 +63,10 @@ const Dashboard = () => {
   const [successMsg, setSuccessMsg] = useState('');
   const [selectedTier, setSelectedTier] = useState('all');
   const [displayedCount, setDisplayedCount] = useState(20);
+  const [isScrapeModalOpen, setIsScrapeModalOpen] = useState(false);
 
+  // Filter places having websites ready for email scraping
+  const placesWithWebsites = places.filter((place) => Boolean(place.website));
 
   // Filter places based on selected tier
   const filteredPlaces = selectedTier === 'all'
@@ -237,6 +242,37 @@ const Dashboard = () => {
               {/* Data Export Options */}
               <ExportButton filters={currentFilters || {}} />
 
+              {/* Website Scraping Campaign Lead Action */}
+              {placesWithWebsites.length > 0 && (
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-2xl border border-violet-200 dark:border-violet-900/60 bg-gradient-to-r from-violet-50/80 via-indigo-50/50 to-cyan-50/40 dark:from-violet-950/30 dark:via-indigo-950/20 dark:to-cyan-950/20 shadow-sm">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 rounded-xl bg-violet-600 text-white shadow-md shadow-violet-500/25 shrink-0">
+                      <Globe className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-bold text-slate-900 dark:text-white">
+                          {placesWithWebsites.length} of {places.length} leads have websites available
+                        </p>
+                        <span className="hidden sm:inline-block px-2 py-0.5 rounded-full text-[10px] font-bold bg-violet-100 dark:bg-violet-950/60 text-violet-700 dark:text-violet-300 border border-violet-200 dark:border-violet-800">
+                          Email Discovery
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                        Add leads with valid websites to a scraping campaign to automatically extract business emails.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setIsScrapeModalOpen(true)}
+                    className="w-full sm:w-auto shrink-0 px-4 py-2.5 text-xs font-bold text-white bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 rounded-xl shadow-md shadow-violet-500/25 hover:shadow-violet-500/35 transition flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <Sparkles className="w-4 h-4" />
+                    <span>Scrape Emails ({placesWithWebsites.length} Websites)</span>
+                  </button>
+                </div>
+              )}
+
               {/* Results Table Section */}
               <div className="space-y-2">
                 <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
@@ -325,6 +361,17 @@ const Dashboard = () => {
           )}
         </>
       )}
+
+      {/* Scraping Campaign Modal */}
+      <AddToScrapingCampaignModal
+        isOpen={isScrapeModalOpen}
+        onClose={() => setIsScrapeModalOpen(false)}
+        places={placesWithWebsites}
+        onSuccess={(res) => {
+          setSuccessMsg(res.message || 'Websites added to scraping campaign!');
+          setTimeout(() => setSuccessMsg(''), 4000);
+        }}
+      />
     </div>
   );
 };

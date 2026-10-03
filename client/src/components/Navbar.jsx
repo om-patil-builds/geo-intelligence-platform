@@ -47,6 +47,9 @@ const Navbar = () => {
                 <NavLink to="/history" className={navLinkClass}>
                   Search History
                 </NavLink>
+                <NavLink to="/scraping" className={navLinkClass}>
+                  Scraper Campaigns
+                </NavLink>
               </>
             ) : (
               <NavLink to="/" className={navLinkClass}>
@@ -128,6 +131,13 @@ const Navbar = () => {
                   className="block px-3 py-2.5 rounded-xl text-base font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
                 >
                   Search History
+                </NavLink>
+                <NavLink
+                  to="/scraping"
+                  onClick={() => setIsOpen(false)}
+                  className="block px-3 py-2.5 rounded-xl text-base font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+                >
+                  Scraper Campaigns
                 </NavLink>
                 <NavLink
                   to="/pricing"
