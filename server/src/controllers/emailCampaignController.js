@@ -210,6 +210,34 @@ export const startEmailCampaignHandler = asyncHandler(async (req, res) => {
     throw error;
   }
 
+  // Verify connected Gmail account has send permission
+  const emailAccount = await EmailAccount.findOne({
+    user: req.user._id,
+    isConnected: true,
+  });
+
+  if (!emailAccount) {
+    const error = new Error("No connected Gmail account found. Please connect your Gmail account via Google OAuth.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const hasSendScope = (emailAccount.scope || []).some(
+    (s) =>
+      s.includes("gmail.send") ||
+      s.includes("mail.google.com") ||
+      s.includes("gmail.modify") ||
+      s.includes("gmail.compose")
+  );
+
+  if (!hasSendScope) {
+    const error = new Error(
+      "Your connected Google account is missing permission to send emails. Please disconnect and reconnect your Google account, and be sure to check the 'Send email on your behalf' checkbox on Google's permission screen."
+    );
+    error.statusCode = 400;
+    throw error;
+  }
+
   const updatedCampaign = await startEmailCampaign(campaign._id, req.user._id);
 
   res.status(200).json({
@@ -500,6 +528,24 @@ export const handleGoogleAuthCallback = asyncHandler(async (req, res) => {
   try {
     const { tokens, profile } = await handleOAuthCallback(code);
 
+    // Validate that required send permissions were granted
+    const grantedScopes = (tokens.scope || "").split(" ").map((s) => s.trim().toLowerCase());
+    const hasSendScope = grantedScopes.some(
+      (s) =>
+        s.includes("gmail.send") ||
+        s.includes("mail.google.com") ||
+        s.includes("gmail.modify") ||
+        s.includes("gmail.compose")
+    );
+
+    if (!hasSendScope) {
+      return res.redirect(
+        `${clientBase}${targetRedirect}${separator}gmail_error=${encodeURIComponent(
+          "Permission missing: Please make sure to check the 'Send email on your behalf' checkbox during Google authorization."
+        )}`
+      );
+    }
+
     // Encrypt refresh token if present
     const encryptedRefreshToken = tokens.refresh_token ? encryptText(tokens.refresh_token) : undefined;
     const expiryDate = tokens.expiry_date ? new Date(tokens.expiry_date) : new Date(Date.now() + 3600 * 1000);
@@ -559,15 +605,28 @@ export const getConnectedAccountHandler = asyncHandler(async (req, res) => {
     });
   }
 
+  const hasSendScope = (account.scope || []).some((s) => {
+    const lower = String(s).toLowerCase();
+    return (
+      lower.includes("gmail.send") ||
+      lower.includes("mail.google.com") ||
+      lower.includes("gmail.modify") ||
+      lower.includes("gmail.compose")
+    );
+  });
+
   res.status(200).json({
     success: true,
-    connected: true,
+    connected: account.isConnected && hasSendScope,
+    hasInsufficientScopes: !hasSendScope,
     account: {
       id: account._id,
       email: account.email,
       senderName: account.senderName,
       picture: account.picture,
-      isConnected: account.isConnected,
+      isConnected: account.isConnected && hasSendScope,
+      hasInsufficientScopes: !hasSendScope,
+      scope: account.scope,
       lastSyncedAt: account.lastSyncedAt,
       createdAt: account.createdAt,
     },

@@ -182,6 +182,27 @@ const runEmailWorkerLoop = async (campaignId, userId) => {
       } catch (sendErr) {
         console.error(`Gmail API send failed for [${target.recipientEmail}]:`, sendErr.message);
 
+        // Check if user has insufficient authentication scopes (gmail.send missing)
+        if (
+          sendErr.message?.includes("insufficient authentication scopes") ||
+          sendErr.code === 403
+        ) {
+          activeEmailCampaigns.delete(stringId);
+          await markEmailFailed(
+            target._id,
+            "Request had insufficient authentication scopes: Gmail send permission not granted."
+          );
+          await EmailCampaign.findByIdAndUpdate(stringId, {
+            $set: {
+              status: "paused",
+              lastError:
+                "Campaign paused: Gmail account is missing the 'Send email on your behalf' permission. Please disconnect and reconnect your Gmail account, ensuring you check the 'Send email on your behalf' checkbox on Google's consent screen.",
+            },
+          });
+          await syncEmailCampaignStats(stringId);
+          break;
+        }
+
         // Check if user revoked account authorization in Google Account
         if (sendErr.message === "GMAIL_AUTH_REVOKED" || sendErr.code === 401) {
           activeEmailCampaigns.delete(stringId);
@@ -252,6 +273,39 @@ export const startEmailCampaign = async (campaignId, userId) => {
   if (!emailAccount) {
     throw new Error("Please connect your Gmail account via Google OAuth before launching an outreach campaign.");
   }
+
+  // Verify that the connected account has the required send scope
+  const hasSendScope = (emailAccount.scope || []).some((s) => {
+    const lower = String(s).toLowerCase();
+    return (
+      lower.includes("gmail.send") ||
+      lower.includes("mail.google.com") ||
+      lower.includes("gmail.modify") ||
+      lower.includes("gmail.compose")
+    );
+  });
+
+  if (!hasSendScope) {
+    throw new Error(
+      "Your connected Gmail account is missing email-sending permissions ('Send email on your behalf'). Please disconnect and reconnect your Gmail account in Email Settings, making sure to grant the send permission."
+    );
+  }
+
+  // Auto-reset previously failed targets with scope/auth errors back to pending
+  await EmailTarget.updateMany(
+    {
+      campaign: stringId,
+      status: "failed",
+      errorMessage: { $regex: /insufficient authentication scopes|missing permission|scope/i },
+    },
+    {
+      $set: {
+        status: "pending",
+        attempts: 0,
+        errorMessage: null,
+      },
+    }
+  );
 
   // Associate campaign with emailAccount if not already set
   if (!campaign.emailAccount) {

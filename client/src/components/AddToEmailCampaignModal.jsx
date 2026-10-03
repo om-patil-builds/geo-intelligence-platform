@@ -21,6 +21,8 @@ const AddToEmailCampaignModal = ({
   scrapingCampaignId,
   leadsCount = 0,
   targetIds = [],
+  defaultName = '',
+  defaultCategory = '',
   onSuccess,
 }) => {
   const navigate = useNavigate();
@@ -31,8 +33,8 @@ const AddToEmailCampaignModal = ({
 
   // Form states
   const [selectedCampaignId, setSelectedCampaignId] = useState('');
-  const [name, setName] = useState('');
-  const [category, setCategory] = useState('');
+  const [name, setName] = useState(defaultName || '');
+  const [category, setCategory] = useState(defaultCategory || '');
   const [subject, setSubject] = useState(DEFAULT_SUBJECT);
   const [templateBody, setTemplateBody] = useState(DEFAULT_BODY);
 
@@ -44,9 +46,12 @@ const AddToEmailCampaignModal = ({
     try {
       const data = await emailService.getCampaigns();
       if (data.success) {
-        setCampaigns(data.campaigns || []);
-        if (data.campaigns?.length > 0) {
-          setSelectedCampaignId(data.campaigns[0]._id);
+        const list = data.campaigns || [];
+        setCampaigns(list);
+        if (list.length > 0) {
+          setSelectedCampaignId(list[0]._id);
+          // If existing campaigns exist, default to existing or new with pre-filled details
+          setMode('existing');
         } else {
           setMode('new');
         }
@@ -60,9 +65,12 @@ const AddToEmailCampaignModal = ({
 
   useEffect(() => {
     if (isOpen) {
+      setName(defaultName || '');
+      setCategory(defaultCategory || '');
+      setErrorMsg('');
       loadCampaigns();
     }
-  }, [isOpen, loadCampaigns]);
+  }, [isOpen, defaultName, defaultCategory, loadCampaigns]);
 
   if (!isOpen) return null;
 

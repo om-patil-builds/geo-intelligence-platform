@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import ScrapingCampaign from "../models/ScrapingCampaign.js";
 import ScrapingTarget from "../models/ScrapingTarget.js";
 import Place from "../models/Place.js";
@@ -149,8 +150,13 @@ export const markTargetFailed = async (targetId, errorMessage = "Scraping failed
  * Recalculate campaign statistics atomically
  */
 export const syncCampaignStats = async (campaignId) => {
+  const objectId =
+    campaignId instanceof mongoose.Types.ObjectId
+      ? campaignId
+      : new mongoose.Types.ObjectId(String(campaignId));
+
   const [counts] = await ScrapingTarget.aggregate([
-    { $match: { campaign: campaignId } },
+    { $match: { campaign: objectId } },
     {
       $group: {
         _id: null,
@@ -170,7 +176,12 @@ export const syncCampaignStats = async (campaignId) => {
         emailsFoundCount: {
           $sum: {
             $cond: [
-              { $and: [{ $eq: ["$status", "scraped"] }, { $gt: [{ $size: "$emails" }, 0] }] },
+              {
+                $and: [
+                  { $eq: ["$status", "scraped"] },
+                  { $gt: [{ $size: { $ifNull: ["$emails", []] } }, 0] },
+                ],
+              },
               1,
               0,
             ],

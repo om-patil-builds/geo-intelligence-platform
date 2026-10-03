@@ -17,8 +17,12 @@ const GmailSettingsModal = ({ isOpen, onClose, onSettingsUpdated }) => {
     setErrorMsg('');
     try {
       const res = await emailService.getConnectedAccount();
-      if (res.success && res.connected && res.account) {
-        setAccount(res.account);
+      if (res.success && res.account) {
+        setAccount({
+          ...res.account,
+          isConnected: res.connected && !res.hasInsufficientScopes,
+          hasInsufficientScopes: res.hasInsufficientScopes,
+        });
         setSenderName(res.account.senderName || '');
       } else {
         setAccount(null);
@@ -154,6 +158,64 @@ const GmailSettingsModal = ({ isOpen, onClose, onSettingsUpdated }) => {
           <div className="py-12 flex flex-col items-center justify-center gap-3">
             <Loader2 className="w-8 h-8 text-emerald-500 animate-spin" />
             <p className="text-xs font-semibold text-slate-500">Checking Gmail OAuth status...</p>
+          </div>
+        ) : account && account.hasInsufficientScopes ? (
+          /* INSUFFICIENT SCOPES STATE */
+          <div className="mt-5 space-y-5">
+            <div className="p-4 rounded-2xl border border-amber-300 dark:border-amber-800 bg-amber-50/80 dark:bg-amber-950/40 space-y-3">
+              <div className="flex items-center gap-2 text-amber-800 dark:text-amber-300 font-bold text-xs">
+                <AlertCircle className="w-5 h-5 text-amber-600 shrink-0" />
+                <span>Permission Missing: "Send email on your behalf"</span>
+              </div>
+              <p className="text-xs text-amber-800 dark:text-amber-200 leading-relaxed">
+                Your Google account <strong>({account.email})</strong> is linked, but the checkbox for <strong>"Send email on your behalf"</strong> was left unchecked on Google&apos;s authorization screen.
+              </p>
+              <div className="p-3.5 bg-white/80 dark:bg-black/40 rounded-xl border border-amber-200 dark:border-amber-800/60 text-xs text-amber-900 dark:text-amber-300 space-y-1.5">
+                <p className="font-bold text-[11px] uppercase tracking-wider">How to resolve:</p>
+                <ol className="list-decimal list-inside space-y-1 text-[11px] leading-relaxed">
+                  <li>Click the <strong>Re-authorize Google Account</strong> button below.</li>
+                  <li>On Google&apos;s consent screen, tick the checkbox: <strong>&quot;Send email on your behalf&quot;</strong>.</li>
+                  <li>Click <strong>Continue</strong> to grant email dispatch capability.</li>
+                </ol>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleConnectGoogle}
+                disabled={initiatingOAuth}
+                className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white font-bold text-xs shadow-md transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
+              >
+                {initiatingOAuth ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Connecting to Google...</span>
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="w-4 h-4" />
+                    <span>Re-authorize with &quot;Send email&quot; Permission</span>
+                  </>
+                )}
+              </button>
+            </div>
+
+            <div className="flex justify-between items-center pt-2 border-t border-slate-100 dark:border-slate-800">
+              <button
+                type="button"
+                onClick={handleDisconnect}
+                disabled={disconnecting}
+                className="text-xs font-semibold text-red-600 hover:underline cursor-pointer"
+              >
+                {disconnecting ? 'Disconnecting...' : 'Disconnect Account'}
+              </button>
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
           </div>
         ) : account && account.isConnected ? (
           /* CONNECTED STATE */

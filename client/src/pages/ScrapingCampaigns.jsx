@@ -110,8 +110,31 @@ const ScrapingCampaigns = () => {
           setActiveCampaign((prev) =>
             prev ? { ...prev, status: event.status, stats: event.stats } : prev
           );
-          // If status transitioned to completed
-          if (event.status === 'completed') {
+
+          // Live update table rows for recently scraped websites
+          if (event.recentActivity && Array.isArray(event.recentActivity)) {
+            setTargets((prevTargets) => {
+              if (!prevTargets || prevTargets.length === 0) return prevTargets;
+              const activityMap = new Map(
+                event.recentActivity.map((a) => [a._id || a.websiteUrl, a])
+              );
+              return prevTargets.map((target) => {
+                const updated = activityMap.get(target._id) || activityMap.get(target.websiteUrl);
+                if (updated) {
+                  return {
+                    ...target,
+                    status: updated.status || target.status,
+                    emails: updated.emails || target.emails,
+                    errorMessage: updated.errorMessage || target.errorMessage,
+                  };
+                }
+                return target;
+              });
+            });
+          }
+
+          // If status transitioned to completed or failed
+          if (event.status === 'completed' || event.status === 'failed') {
             loadCampaignDetail(id, targetFilter);
             loadCampaigns();
           }
@@ -522,6 +545,16 @@ const ScrapingCampaigns = () => {
             </div>
           )}
         </div>
+
+        {/* Add To Email Campaign Modal */}
+        <AddToEmailCampaignModal
+          isOpen={isEmailModalOpen}
+          onClose={() => setIsEmailModalOpen(false)}
+          scrapingCampaignId={activeCampaign?._id}
+          leadsCount={activeCampaign?.stats?.emailsFoundCount || 0}
+          defaultName={activeCampaign ? `${activeCampaign.name} Outreach` : ''}
+          defaultCategory={activeCampaign?.topic || ''}
+        />
       </div>
     );
   }
@@ -651,6 +684,8 @@ const ScrapingCampaigns = () => {
         onClose={() => setIsEmailModalOpen(false)}
         scrapingCampaignId={activeCampaign?._id}
         leadsCount={activeCampaign?.stats?.emailsFoundCount || 0}
+        defaultName={activeCampaign ? `${activeCampaign.name} Outreach` : ''}
+        defaultCategory={activeCampaign?.topic || ''}
       />
     </div>
   );

@@ -75,6 +75,9 @@ export const getCampaignById = asyncHandler(async (req, res) => {
     throw error;
   }
 
+  // Ensure statistics are completely fresh and accurate
+  const freshCampaign = (await syncCampaignStats(campaign._id)) || campaign;
+
   const { status, page = 1, limit = 50 } = req.query;
   const filter = { campaign: campaign._id };
   if (status && status !== "all") {
@@ -94,7 +97,7 @@ export const getCampaignById = asyncHandler(async (req, res) => {
 
   res.status(200).json({
     success: true,
-    campaign,
+    campaign: freshCampaign,
     isRunning: isCampaignRunning(campaign._id),
     targets,
     pagination: {
@@ -312,7 +315,7 @@ export const getCampaignProgress = asyncHandler(async (req, res) => {
   const campaign = await ScrapingCampaign.findOne({
     _id: req.params.id,
     user: req.user._id,
-  }).select("name topic status stats startedAt completedAt pausedAt");
+  });
 
   if (!campaign) {
     const error = new Error("Campaign not found");
@@ -320,19 +323,21 @@ export const getCampaignProgress = asyncHandler(async (req, res) => {
     throw error;
   }
 
+  const freshCampaign = (await syncCampaignStats(campaign._id)) || campaign;
+
   // Fetch the 5 most recently updated targets for live feed
   const recentActivity = await ScrapingTarget.find({ campaign: campaign._id })
     .sort({ updatedAt: -1 })
     .limit(5)
     .select("businessName websiteUrl status emails updatedAt errorMessage");
 
-  const total = campaign.stats.totalWebsites || 0;
-  const processed = (campaign.stats.scrapedCount || 0) + (campaign.stats.failedCount || 0);
+  const total = freshCampaign.stats.totalWebsites || 0;
+  const processed = (freshCampaign.stats.scrapedCount || 0) + (freshCampaign.stats.failedCount || 0);
   const progressPercent = total > 0 ? Math.min(Math.round((processed / total) * 100), 100) : 0;
 
   res.status(200).json({
     success: true,
-    campaign,
+    campaign: freshCampaign,
     isRunning: isCampaignRunning(campaign._id),
     progressPercent,
     recentActivity,
@@ -365,10 +370,15 @@ export const streamCampaignProgress = asyncHandler(async (req, res) => {
 
   const sendUpdate = async () => {
     try {
-      const current = await ScrapingCampaign.findById(campaign._id).select(
+      let current = await ScrapingCampaign.findById(campaign._id).select(
         "status stats startedAt completedAt pausedAt"
       );
       if (!current) return;
+
+      if (isCampaignRunning(campaign._id)) {
+        const synced = await syncCampaignStats(campaign._id);
+        if (synced) current = synced;
+      }
 
       const total = current.stats.totalWebsites || 0;
       const processed = (current.stats.scrapedCount || 0) + (current.stats.failedCount || 0);

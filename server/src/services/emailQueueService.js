@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import EmailCampaign from "../models/EmailCampaign.js";
 import EmailTarget from "../models/EmailTarget.js";
 import ScrapingTarget from "../models/ScrapingTarget.js";
@@ -105,8 +106,13 @@ export const markEmailFailed = async (targetId, errorMessage = "Sending failed")
  * Recalculate email campaign statistics atomically
  */
 export const syncEmailCampaignStats = async (campaignId) => {
+  const objectId =
+    campaignId instanceof mongoose.Types.ObjectId
+      ? campaignId
+      : new mongoose.Types.ObjectId(String(campaignId));
+
   const [counts] = await EmailTarget.aggregate([
-    { $match: { campaign: campaignId } },
+    { $match: { campaign: objectId } },
     {
       $group: {
         _id: null,
@@ -154,17 +160,33 @@ export const importScrapedLeadsToCampaign = async (
   emailCampaignId,
   { scrapingCampaignId, targetIds } = {}
 ) => {
+  const userObjectId =
+    userId instanceof mongoose.Types.ObjectId
+      ? userId
+      : new mongoose.Types.ObjectId(String(userId));
+
+  const emailCampaignObjectId =
+    emailCampaignId instanceof mongoose.Types.ObjectId
+      ? emailCampaignId
+      : new mongoose.Types.ObjectId(String(emailCampaignId));
+
   const query = {
-    user: userId,
-    status: "scraped",
+    user: userObjectId,
     "emails.0": { $exists: true },
   };
 
   if (scrapingCampaignId) {
-    query.campaign = scrapingCampaignId;
+    query.campaign =
+      scrapingCampaignId instanceof mongoose.Types.ObjectId
+        ? scrapingCampaignId
+        : new mongoose.Types.ObjectId(String(scrapingCampaignId));
   }
   if (Array.isArray(targetIds) && targetIds.length > 0) {
-    query._id = { $in: targetIds };
+    query._id = {
+      $in: targetIds.map((tid) =>
+        tid instanceof mongoose.Types.ObjectId ? tid : new mongoose.Types.ObjectId(String(tid))
+      ),
+    };
   }
 
   const scrapedTargets = await ScrapingTarget.find(query).select(
@@ -189,13 +211,13 @@ export const importScrapedLeadsToCampaign = async (
         bulkOps.push({
           updateOne: {
             filter: {
-              campaign: emailCampaignId,
+              campaign: emailCampaignObjectId,
               recipientEmail: emailStr,
             },
             update: {
               $setOnInsert: {
-                user: userId,
-                campaign: emailCampaignId,
+                user: userObjectId,
+                campaign: emailCampaignObjectId,
                 scrapingTarget: st._id,
                 place: st.place,
                 recipientEmail: emailStr,
@@ -203,7 +225,7 @@ export const importScrapedLeadsToCampaign = async (
                 website: st.websiteUrl,
                 status: "pending",
                 attempts: 0,
-                idempotencyKey: `${emailCampaignId}_${emailStr}`,
+                idempotencyKey: `${emailCampaignObjectId}_${emailStr}`,
               },
             },
             upsert: true,
@@ -219,7 +241,7 @@ export const importScrapedLeadsToCampaign = async (
     upsertedCount = result.upsertedCount || 0;
   }
 
-  const updatedCampaign = await syncEmailCampaignStats(emailCampaignId);
+  const updatedCampaign = await syncEmailCampaignStats(emailCampaignObjectId);
 
   return {
     addedCount: upsertedCount,

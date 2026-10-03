@@ -78,10 +78,11 @@ const EmailCampaigns = () => {
   const loadGmailSettings = useCallback(async () => {
     try {
       const data = await emailService.getConnectedAccount();
-      if (data.success && data.connected && data.account) {
+      if (data.success && data.account) {
         setGmailSettings({
           ...data.account,
-          isConnected: true,
+          isConnected: data.connected && !data.hasInsufficientScopes,
+          hasInsufficientScopes: Boolean(data.hasInsufficientScopes),
         });
       } else {
         setGmailSettings(null);
@@ -388,7 +389,12 @@ const EmailCampaigns = () => {
               <h2 className="text-sm font-extrabold text-slate-900 dark:text-white">
                 Gmail Sender Account:
               </h2>
-              {gmailSettings?.isConnected ? (
+              {gmailSettings?.hasInsufficientScopes ? (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-900 dark:bg-amber-950/80 dark:text-amber-200 border border-amber-300 dark:border-amber-700 animate-pulse">
+                  <AlertCircle className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                  Permission Missing: {gmailSettings.email}
+                </span>
+              ) : gmailSettings?.isConnected ? (
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
                   <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
                   {gmailSettings.email}
@@ -400,7 +406,9 @@ const EmailCampaigns = () => {
               )}
             </div>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-              {gmailSettings?.isConnected
+              {gmailSettings?.hasInsufficientScopes
+                ? 'Google OAuth connected, but the "Send email on your behalf" permission was left unchecked. Re-authorize to enable dispatch.'
+                : gmailSettings?.isConnected
                 ? 'Connected via official Google OAuth 2.0 (Gmail REST API).'
                 : 'Connect your Google account via OAuth 2.0 to enable direct email dispatch with high deliverability. No passwords required.'}
             </p>
@@ -412,7 +420,13 @@ const EmailCampaigns = () => {
           className="w-full sm:w-auto px-4 py-2 text-xs font-bold text-slate-700 dark:text-slate-200 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700/80 rounded-xl transition flex items-center justify-center gap-2 cursor-pointer shrink-0"
         >
           <Sliders className="w-4 h-4 text-emerald-500" />
-          <span>{gmailSettings?.isConnected ? 'Google Account' : 'Connect Gmail'}</span>
+          <span>
+            {gmailSettings?.hasInsufficientScopes
+              ? 'Fix Send Permission'
+              : gmailSettings?.isConnected
+              ? 'Google Account'
+              : 'Connect Gmail'}
+          </span>
         </button>
       </div>
 
