@@ -35,17 +35,12 @@ function toRows(places) {
     name: place.name,
     category: place.category,
     address: place.address,
-    latitude: place.lat,
-    longitude: place.lng,
     phone: place.phone,
     website: place.website,
     rating: place.rating,
     reviewCount: place.reviewCount,
     leadScore: place.leadScore,
     leadTier: place.leadTier,
-    searchKeyword: place.searchKeyword,
-    searchLocation: place.searchLocation,
-    googlePlaceId: place.placeId,
   }));
 }
 
@@ -59,7 +54,7 @@ function getFilename(req, places, extension) {
   }
 
   if (keyword && location) {
-    return `${keyword} in ${location}.${extension}`;
+    return `${keyword}_${location}.${extension}`;
   } else if (keyword) {
     return `${keyword}.${extension}`;
   } else if (location) {
