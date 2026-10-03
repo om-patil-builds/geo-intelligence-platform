@@ -9,6 +9,7 @@ import exportRoutes from "./routes/exportRoutes.js";
 import placeRoutes from "./routes/placeRoutes.js";
 import historyRoutes from "./routes/historyRoutes.js";
 import scrapingRoutes from "./routes/scrapingRoutes.js";
+import emailCampaignRoutes from "./routes/emailCampaignRoutes.js";
 
 import {
   errorHandler,
@@ -71,6 +72,7 @@ app.use("/api/places", placeRoutes);
 app.use("/api/export", exportRoutes);
 app.use("/api/history", historyRoutes);
 app.use("/api/scraping", scrapingRoutes);
+app.use("/api/email", emailCampaignRoutes);
 
 // Error Handlers
 app.use(notFoundHandler);

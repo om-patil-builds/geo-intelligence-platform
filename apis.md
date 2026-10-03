@@ -571,6 +571,112 @@ All scraping routes are mounted under `/api/scraping` and require authentication
 - **Response** (text/event-stream):
   - Streams real-time progress events every 2 seconds with stats and latest scraped targets.
 
+## Email Campaign Endpoints
+
+All email outreach routes are mounted under `/api/email` and require authentication.
+
+### Create Email Campaign
+- **Method**: POST
+- **Path**: `/api/email/campaigns`
+- **Request Body**:
+  ```json
+  {
+    "name": "string (required, e.g. Pune Gyms Cold Outreach)",
+    "category": "string (required, e.g. Gyms, Software, NGOs)",
+    "subject": "string (optional email subject line)",
+    "templateBody": "string (optional body with {businessName}, {website} variables)",
+    "sendDelaySeconds": "number (optional 1-60, default: 3)"
+  }
+  ```
+- **Response** (201 Created):
+  ```json
+  {
+    "success": true,
+    "message": "Email outreach campaign created successfully",
+    "campaign": { "id": "...", "name": "...", "category": "...", "status": "draft", "stats": { ... } }
+  }
+  ```
+
+### List Email Campaigns
+- **Method**: GET
+- **Path**: `/api/email/campaigns`
+- **Response** (200 OK):
+  ```json
+  {
+    "success": true,
+    "campaigns": [ ... ]
+  }
+  ```
+
+### Get Email Campaign Details
+- **Method**: GET
+- **Path**: `/api/email/campaigns/:id`
+- **Query Parameters**: `status` (all/pending/sent/failed), `page`, `limit`
+- **Response** (200 OK):
+  ```json
+  {
+    "success": true,
+    "campaign": { ... },
+    "targets": [ ... ],
+    "pagination": { "total": 45, "page": 1, "pages": 1, "limit": 50 }
+  }
+  ```
+
+### Update Email Campaign Template
+- **Method**: PUT
+- **Path**: `/api/email/campaigns/:id`
+- **Request Body**:
+  ```json
+  {
+    "subject": "Exclusive partnership for {businessName}",
+    "templateBody": "Hi {businessName} team,\n\nWe came across {website} and...",
+    "sendDelaySeconds": 5
+  }
+  ```
+- **Response** (200 OK):
+  ```json
+  {
+    "success": true,
+    "message": "Email campaign updated successfully",
+    "campaign": { ... }
+  }
+  ```
+
+### Import Scraped Leads
+- **Method**: POST
+- **Path**: `/api/email/campaigns/:id/import-leads`
+- **Request Body**:
+  ```json
+  {
+    "scrapingCampaignId": "string (optional, import all leads from this scraping campaign)",
+    "targetIds": ["targetId1", "targetId2"]
+  }
+  ```
+- **Response** (200 OK):
+  ```json
+  {
+    "success": true,
+    "message": "Imported 38 new email lead(s) into campaign",
+    "addedCount": 38,
+    "skippedCount": 2,
+    "totalEmails": 38,
+    "campaign": { ... }
+  }
+  ```
+
+### Get Email Campaign Progress
+- **Method**: GET
+- **Path**: `/api/email/campaigns/:id/progress`
+- **Response** (200 OK):
+  ```json
+  {
+    "success": true,
+    "campaign": { ... },
+    "progressPercent": 50,
+    "recentActivity": [ ... ]
+  }
+  ```
+
 ## Authentication
 
 All endpoints except authentication routes require a valid JWT token in the Authorization header:
