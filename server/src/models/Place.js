@@ -26,6 +26,9 @@ const placeSchema = new mongoose.Schema(
     rawTypes: { type: [String], default: [] },
     source: { type: String, default: "google_places" },
     aiSummary: { type: String, default: null },
+    emails: { type: [String], default: [] },
+    emailScraped: { type: Boolean, default: false },
+    lastScrapedAt: { type: Date, default: null },
   },
   {
     timestamps: true,

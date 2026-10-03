@@ -445,6 +445,132 @@ All export routes are mounted under `/api/export` and require authentication
   - **Body**: Excel file with sheet "Places" containing columns:
     - name, category, address, phone, website, rating, reviewCount, leadScore, leadTier
 
+## Scraping Campaign Endpoints
+
+All scraping routes are mounted under `/api/scraping` and require authentication.
+
+### Create Campaign
+- **Method**: POST
+- **Path**: `/api/scraping/campaigns`
+- **Request Body**:
+  ```json
+  {
+    "name": "string (required, e.g. Pune Gyms Outreach)",
+    "topic": "string (required, e.g. Gyms, Software, NGOs)",
+    "concurrency": "number (optional, 1-6, default: 3)"
+  }
+  ```
+- **Response** (201 Created):
+  ```json
+  {
+    "success": true,
+    "message": "Scraping campaign created successfully",
+    "campaign": { "id": "...", "name": "...", "topic": "...", "status": "draft", "stats": { ... } }
+  }
+  ```
+
+### List Campaigns
+- **Method**: GET
+- **Path**: `/api/scraping/campaigns`
+- **Response** (200 OK):
+  ```json
+  {
+    "success": true,
+    "campaigns": [ ... ]
+  }
+  ```
+
+### Get Campaign Details
+- **Method**: GET
+- **Path**: `/api/scraping/campaigns/:id`
+- **Query Parameters**: `status` (all/pending/scraped/failed), `page`, `limit`
+- **Response** (200 OK):
+  ```json
+  {
+    "success": true,
+    "campaign": { ... },
+    "isRunning": "boolean",
+    "targets": [ ... ],
+    "pagination": { "total": 100, "page": 1, "pages": 2, "limit": 50 }
+  }
+  ```
+
+### Add Places to Campaign
+- **Method**: POST
+- **Path**: `/api/scraping/campaigns/:id/add-places`
+- **Request Body**:
+  ```json
+  {
+    "placeIds": ["placeId1", "placeId2"]
+  }
+  ```
+- **Response** (200 OK):
+  ```json
+  {
+    "success": true,
+    "message": "Added 15 new website(s) to campaign",
+    "addedCount": 15,
+    "skippedCount": 2,
+    "campaign": { ... }
+  }
+  ```
+
+### Start Campaign
+- **Method**: POST
+- **Path**: `/api/scraping/campaigns/:id/start`
+- **Response** (200 OK):
+  ```json
+  {
+    "success": true,
+    "message": "Campaign scraping started",
+    "campaign": { ... }
+  }
+  ```
+
+### Pause Campaign
+- **Method**: POST
+- **Path**: `/api/scraping/campaigns/:id/pause`
+- **Response** (200 OK):
+  ```json
+  {
+    "success": true,
+    "message": "Campaign scraping paused",
+    "campaign": { ... }
+  }
+  ```
+
+### Resume Campaign
+- **Method**: POST
+- **Path**: `/api/scraping/campaigns/:id/resume`
+- **Response** (200 OK):
+  ```json
+  {
+    "success": true,
+    "message": "Campaign scraping resumed",
+    "campaign": { ... }
+  }
+  ```
+
+### Get Campaign Progress
+- **Method**: GET
+- **Path**: `/api/scraping/campaigns/:id/progress`
+- **Response** (200 OK):
+  ```json
+  {
+    "success": true,
+    "campaign": { ... },
+    "isRunning": "boolean",
+    "progressPercent": 65,
+    "recentActivity": [ ... ]
+  }
+  ```
+
+### Stream Live Progress (Server-Sent Events)
+- **Method**: GET
+- **Path**: `/api/scraping/campaigns/:id/stream`
+- **Response** (text/event-stream):
+  - Streams real-time progress events every 2 seconds with stats and latest scraped targets.
+
 ## Authentication
 
 All endpoints except authentication routes require a valid JWT token in the Authorization header:
