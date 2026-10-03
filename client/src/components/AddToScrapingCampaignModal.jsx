@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Globe, Plus, Play, Sparkles, X, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Globe, Plus, Play, Sparkles, X, AlertCircle } from 'lucide-react';
 import scrapingService from '../services/scrapingService';
 
 const POPULAR_TOPICS = [
@@ -17,7 +17,6 @@ const AddToScrapingCampaignModal = ({ isOpen, onClose, places = [], onSuccess })
 
   const [mode, setMode] = useState('new'); // 'new' or 'existing'
   const [campaigns, setCampaigns] = useState([]);
-  const [loadingCampaigns, setLoadingCampaigns] = useState(false);
 
   // Form states
   const [selectedCampaignId, setSelectedCampaignId] = useState('');
@@ -31,15 +30,7 @@ const AddToScrapingCampaignModal = ({ isOpen, onClose, places = [], onSuccess })
   // Eligible places with websites
   const eligiblePlaces = places.filter((p) => Boolean(p.website));
 
-  useEffect(() => {
-    if (isOpen) {
-      setErrorMsg('');
-      loadCampaigns();
-    }
-  }, [isOpen]);
-
-  const loadCampaigns = async () => {
-    setLoadingCampaigns(true);
+  const loadCampaigns = useCallback(async () => {
     try {
       const data = await scrapingService.getCampaigns();
       if (data.success) {
@@ -52,10 +43,15 @@ const AddToScrapingCampaignModal = ({ isOpen, onClose, places = [], onSuccess })
       }
     } catch (err) {
       console.error('Failed to load campaigns:', err);
-    } finally {
-      setLoadingCampaigns(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    if (isOpen) {
+      loadCampaigns();
+    }
+  }, [isOpen, loadCampaigns]);
+
 
   if (!isOpen) return null;
 

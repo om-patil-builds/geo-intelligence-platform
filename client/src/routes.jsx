@@ -8,6 +8,7 @@ import Register from './pages/Register';
 import SearchHistory from './pages/SearchHistory';
 import HistoryResults from './pages/HistoryResults';
 import ScrapingCampaigns from './pages/ScrapingCampaigns';
+import EmailCampaigns from './pages/EmailCampaigns';
 import FAQ from './pages/FAQ';
 import Pricing from './pages/Pricing';
 import NotFound from './pages/NotFound';
@@ -56,6 +57,8 @@ const AppRoutes = () => {
           <Route path="history/:id" element={<HistoryResults />} />
           <Route path="scraping" element={<ScrapingCampaigns />} />
           <Route path="scraping/:id" element={<ScrapingCampaigns />} />
+          <Route path="email" element={<EmailCampaigns />} />
+          <Route path="email/:id" element={<EmailCampaigns />} />
         </Route>
 
         {/* 404 Route */}

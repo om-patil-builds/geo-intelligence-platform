@@ -18,13 +18,11 @@ import {
   Database,
   Globe,
   LayoutGrid,
-  MapPinned,
   Radar,
   Route,
   Search,
   ShieldCheck,
-  Sparkles,
-  Target
+  Sparkles
 } from 'lucide-react';
 
 const Dashboard = () => {

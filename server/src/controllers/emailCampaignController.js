@@ -198,6 +198,13 @@ export const startEmailCampaignHandler = asyncHandler(async (req, res) => {
     throw error;
   }
 
+  const targetCount = await EmailTarget.countDocuments({ campaign: campaign._id });
+  if (targetCount === 0) {
+    const error = new Error("Please import or add at least one recipient lead before starting the email campaign.");
+    error.statusCode = 400;
+    throw error;
+  }
+
   const updatedCampaign = await startEmailCampaign(campaign._id, req.user._id);
 
   res.status(200).json({

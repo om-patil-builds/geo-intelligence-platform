@@ -3,7 +3,12 @@ import { verifyAccessToken } from "../utils/generateToken.js";
 
 const authMiddleware = async (req, res, next) => {
   const authHeader = req.headers.authorization || "";
-  const token = authHeader.startsWith("Bearer ") ? authHeader.split(" ")[1] : null;
+  let token = authHeader.startsWith("Bearer ") ? authHeader.split(" ")[1] : null;
+
+  // Support EventSource (SSE) which cannot send custom Authorization headers
+  if (!token && (req.query?.auth_token || req.query?.token)) {
+    token = req.query.auth_token || req.query.token;
+  }
 
   if (!token) {
     return res.status(401).json({

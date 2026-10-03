@@ -50,6 +50,9 @@ const Navbar = () => {
                 <NavLink to="/scraping" className={navLinkClass}>
                   Scraper Campaigns
                 </NavLink>
+                <NavLink to="/email" className={navLinkClass}>
+                  Email Outreach
+                </NavLink>
               </>
             ) : (
               <NavLink to="/" className={navLinkClass}>
@@ -138,6 +141,13 @@ const Navbar = () => {
                   className="block px-3 py-2.5 rounded-xl text-base font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
                 >
                   Scraper Campaigns
+                </NavLink>
+                <NavLink
+                  to="/email"
+                  onClick={() => setIsOpen(false)}
+                  className="block px-3 py-2.5 rounded-xl text-base font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+                >
+                  Email Outreach
                 </NavLink>
                 <NavLink
                   to="/pricing"

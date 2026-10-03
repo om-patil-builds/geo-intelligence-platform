@@ -4,11 +4,9 @@ import {
   Globe,
   Play,
   Pause,
-  RotateCcw,
   Trash2,
   Mail,
   Sparkles,
-  CheckCircle2,
   Clock,
   AlertCircle,
   ArrowLeft,
@@ -18,10 +16,10 @@ import {
   Copy,
   Check,
   Building2,
-  SlidersHorizontal,
 } from 'lucide-react';
 import scrapingService from '../services/scrapingService';
 import LoadingSpinner from '../components/LoadingSpinner';
+import AddToEmailCampaignModal from '../components/AddToEmailCampaignModal';
 
 const statusBadgeClasses = {
   running:
@@ -51,9 +49,10 @@ const ScrapingCampaigns = () => {
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [copiedEmail, setCopiedEmail] = useState(null);
+  const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
 
   // Load campaigns list
-  const loadCampaigns = async () => {
+  const loadCampaigns = useCallback(async () => {
     try {
       const data = await scrapingService.getCampaigns();
       if (data.success) {
@@ -64,7 +63,7 @@ const ScrapingCampaigns = () => {
     } finally {
       setLoadingList(false);
     }
-  };
+  }, []);
 
   // Load active campaign detail and targets
   const loadCampaignDetail = useCallback(async (campaignId, status = 'all') => {
@@ -87,7 +86,7 @@ const ScrapingCampaigns = () => {
 
   useEffect(() => {
     loadCampaigns();
-  }, []);
+  }, [loadCampaigns]);
 
   useEffect(() => {
     if (id) {
@@ -98,9 +97,11 @@ const ScrapingCampaigns = () => {
     }
   }, [id, targetFilter, loadCampaignDetail]);
 
+  const isCampaignRunning = activeCampaign?.status === 'running';
+
   // Subscribe to real-time updates when viewing a running campaign
   useEffect(() => {
-    if (!id || !activeCampaign || activeCampaign.status !== 'running') return;
+    if (!id || !isCampaignRunning) return;
 
     const unsubscribe = scrapingService.subscribeToProgress(
       id,
@@ -122,7 +123,7 @@ const ScrapingCampaigns = () => {
     );
 
     return () => unsubscribe();
-  }, [id, activeCampaign?.status, targetFilter, loadCampaignDetail]);
+  }, [id, isCampaignRunning, targetFilter, loadCampaignDetail, loadCampaigns]);
 
   // Campaign playback controls
   const handleStart = async (campaignId) => {
@@ -397,9 +398,7 @@ const ScrapingCampaigns = () => {
             </div>
 
             <button
-              onClick={() =>
-                alert('Email Outreach Campaign module is ready to be connected in Step 5 & 6!')
-              }
+              onClick={() => setIsEmailModalOpen(true)}
               className="w-full sm:w-auto px-5 py-2.5 text-xs font-bold text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 rounded-xl shadow-md shadow-emerald-500/20 transition flex items-center justify-center gap-1.5 cursor-pointer"
             >
               <Mail className="w-4 h-4" />
@@ -645,6 +644,14 @@ const ScrapingCampaigns = () => {
           })}
         </div>
       )}
+
+      {/* Add To Email Campaign Modal */}
+      <AddToEmailCampaignModal
+        isOpen={isEmailModalOpen}
+        onClose={() => setIsEmailModalOpen(false)}
+        scrapingCampaignId={activeCampaign?._id}
+        leadsCount={activeCampaign?.stats?.emailsFoundCount || 0}
+      />
     </div>
   );
 };

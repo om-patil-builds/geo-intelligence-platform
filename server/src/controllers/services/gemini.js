@@ -1,13 +1,10 @@
 import axios from 'axios';
 
-const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
+const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
 
 export async function generateSummary(place) {
   const apiKey = process.env.GEMINI_API_KEY;
 
-  if (!apiKey) {
-    throw new Error('GEMINI_API_KEY is not configured in the server environment.');
-  }
 
   const prompt = `You are an intelligent Place Insight Analyst.
 
@@ -67,6 +64,10 @@ Review Count: ${place.reviewCount || 'N/A'}
 Opening Hours: ${place.openingHours?.join(', ') || 'N/A'}`;
 
   try {
+    if (!apiKey) {
+      throw new Error('GEMINI_API_KEY is not configured in the server environment.');
+    }
+
     const response = await axios.post(
       `${GEMINI_URL}?key=${apiKey}`,
       {
